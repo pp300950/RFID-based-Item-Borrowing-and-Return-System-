@@ -109,6 +109,21 @@ function bindForm(formId, { buildPayload, endpoint, onSuccess }) {
   });
 }
 
+// -------------------------------------------------------------
+// เก็บ token + ข้อมูลผู้ใช้ แล้วพาไปหน้าที่ตรงกับบทบาท
+// -------------------------------------------------------------
+const TOKEN_KEY = "token";
+const REDIRECT_DELAY_MS = 600; // เผื่อเวลาให้เห็นข้อความสำเร็จก่อนเด้งหน้า
+
+function completeLogin(data, redirectTo) {
+  if (data.token) {
+    localStorage.setItem(TOKEN_KEY, data.token);
+  }
+  setTimeout(() => {
+    window.location.href = redirectTo;
+  }, REDIRECT_DELAY_MS);
+}
+
 // --- นักเรียน: เข้าสู่ระบบ ---
 bindForm("form-student-login", {
   endpoint: "/api/login/student",
@@ -117,7 +132,7 @@ bindForm("form-student-login", {
   }),
   onSuccess: (data) => {
     showStatus(`✅ เข้าสู่ระบบสำเร็จ: ${data.student.name}`, "ok");
-    // TODO: เมื่อมีหน้าโปรไฟล์นักเรียนแล้ว ให้ redirect ไปที่นั่นต่อ
+    completeLogin(data, "/student.html");
   },
 });
 
@@ -143,7 +158,7 @@ bindForm("form-teacher-login", {
   }),
   onSuccess: (data) => {
     showStatus(`✅ เข้าสู่ระบบสำเร็จ: ${data.teacher.name}`, "ok");
-    // TODO: เมื่อมีหน้าโปรไฟล์ครูแล้ว ให้ redirect ไปที่นั่นต่อ
+    completeLogin(data, "/teacher.html");
   },
 });
 
@@ -167,8 +182,8 @@ bindForm("form-admin", {
     username: form.querySelector("#a-username").value.trim(),
     password: form.querySelector("#a-password").value,
   }),
-  onSuccess: () => {
+  onSuccess: (data) => {
     showStatus("✅ เข้าสู่ระบบแอดมินสำเร็จ", "ok");
-    // TODO: เมื่อมีหน้า admin/dashboard แล้ว ให้ redirect ไปที่นั่นต่อ
+    completeLogin(data, "/admin.html");
   },
 });

@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabaseClient");
+const { signToken, requireAuth } = require("../middleware/auth");
 
 // รหัสนักเรียนต้องขึ้นต้นด้วย 693190 และมีความยาวรวม 11 หลัก
 // (ตัวอย่างจากสเปก: 69319011766)
@@ -82,7 +83,9 @@ router.post("/register/student", async (req, res) => {
 
     if (insertError) throw insertError;
 
-    return res.json({ ok: true, student: created });
+    const token = signToken({ role: "student", id: created.id, name: created.name });
+
+    return res.json({ ok: true, student: created, token });
   } catch (err) {
     console.error("Student register error:", err.message);
     return res.status(500).json({
@@ -136,7 +139,9 @@ router.post("/login/student", async (req, res) => {
 
     if (updateError) throw updateError;
 
-    return res.json({ ok: true, student: updated });
+    const token = signToken({ role: "student", id: updated.id, name: updated.name });
+
+    return res.json({ ok: true, student: updated, token });
   } catch (err) {
     console.error("Student login error:", err.message);
     return res.status(500).json({
@@ -198,7 +203,9 @@ router.post("/register/teacher", async (req, res) => {
 
     if (insertError) throw insertError;
 
-    return res.json({ ok: true, teacher: created });
+    const token = signToken({ role: "teacher", id: created.id, name: created.name });
+
+    return res.json({ ok: true, teacher: created, token });
   } catch (err) {
     console.error("Teacher register error:", err.message);
     return res.status(500).json({
@@ -253,7 +260,9 @@ router.post("/login/teacher", async (req, res) => {
 
     if (updateError) throw updateError;
 
-    return res.json({ ok: true, teacher: updated });
+    const token = signToken({ role: "teacher", id: updated.id, name: updated.name });
+
+    return res.json({ ok: true, teacher: updated, token });
   } catch (err) {
     console.error("Teacher login error:", err.message);
     return res.status(500).json({
@@ -282,11 +291,21 @@ router.post("/login/admin", (req, res) => {
   }
 
   if (username === validUsername && password === validPassword) {
-    // เวอร์ชันทดสอบ: ยังไม่ทำ session/JWT จริงจัง แค่ตอบกลับว่าเข้าได้
-    return res.json({ ok: true, role: "admin" });
+    // แอดมินไม่มีแถวในฐานข้อมูล ใช้ role อย่างเดียวเป็น identity ใน token
+    const token = signToken({ role: "admin", id: null, name: "admin" });
+    return res.json({ ok: true, role: "admin", token });
   }
 
   return res.status(401).json({ ok: false, message: "username หรือ password ไม่ถูกต้อง" });
+});
+
+// -------------------------------------------------------------
+// GET /api/me
+// ตรวจสอบ token ปัจจุบันว่ายัง valid อยู่ไหม พร้อมส่งข้อมูล role/id/name
+// กลับไป — ฝั่ง frontend ใช้เช็คตอนโหลดหน้าที่ต้อง login ก่อนเข้า
+// -------------------------------------------------------------
+router.get("/me", requireAuth, (req, res) => {
+  return res.json({ ok: true, user: req.user });
 });
 
 module.exports = router;

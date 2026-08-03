@@ -1,0 +1,534 @@
+/* =================================================================
+   admin.css — ส่วนขยายของ style.css (ใช้ token เดิมทั้งหมด)
+   -----------------------------------------------------------------
+   หน้าแอดมินเป็น "หลังบ้านของบัตรผ่าน": sidebar ซ้ายคือแฟ้มดัชนี 4
+   หมวด (01-04) ตรงกลางเป็นโต๊ะทำงาน — ตารางแก้ไขได้ทันที (inline edit)
+   สื่อถึงสมุดทะเบียนที่พลิกกลับไปมาระหว่างหมวดต่างๆ ได้เร็ว
+   Signature: แถบหมายเลขหมวด (section index) ค้างอยู่บนหัวกระดาษ
+   เหมือนสารบัญที่ถูกเปิดค้างไว้ ให้ความรู้สึกต่อเนื่องกับ step-index
+   บนหน้า login
+   ================================================================= */
+
+.admin-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  background: var(--ink);
+}
+
+/* --- Sidebar --- */
+.admin-sidebar {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(232, 163, 61, 0.10), transparent 45%),
+    var(--panel);
+  border-right: 1px solid var(--ink-line);
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.admin-brand {
+  padding: 0 10px;
+  margin-bottom: 30px;
+}
+
+.admin-brand-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+  margin-bottom: 8px;
+}
+
+.admin-brand-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.admin-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-nav-btn {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-mid);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-nav-btn:hover {
+  background: var(--panel-2);
+  color: var(--text-hi);
+}
+
+.admin-nav-btn.is-active {
+  background: rgba(232, 163, 61, 0.14);
+  color: var(--amber);
+}
+
+.admin-nav-index {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--ink-line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  color: var(--text-low);
+}
+
+.admin-nav-btn.is-active .admin-nav-index {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.admin-sidebar-footer {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px dashed var(--ink-line);
+}
+
+.admin-user-name {
+  font-size: 13px;
+  color: var(--text-mid);
+  margin: 0 0 10px 10px;
+}
+
+.logout-btn {
+  width: 100%;
+  border: 1px solid var(--ink-line);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 0;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.logout-btn:hover {
+  border-color: #E0645A;
+  color: #E0645A;
+}
+
+/* --- Main content --- */
+.admin-main {
+  padding: 36px 44px 60px;
+  max-width: 1040px;
+}
+
+.admin-header {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--ink-line);
+}
+
+.admin-header-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--amber);
+  margin-bottom: 8px;
+}
+
+.admin-header-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* --- Sections --- */
+.admin-section { display: none; }
+.admin-section.is-active { display: block; }
+
+.admin-card {
+  background: var(--panel-2);
+  border: 1px solid var(--ink-line);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.admin-card-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-hi);
+  margin: 0 0 18px;
+}
+
+/* --- Create forms (inline row of fields) --- */
+.create-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.create-form .field {
+  margin-bottom: 0;
+  flex: 1 1 160px;
+}
+
+.create-form label {
+  font-size: 11.5px;
+  color: var(--text-mid);
+  margin-bottom: 6px;
+}
+
+.create-form input,
+.create-form select {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--ink-line);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  color: var(--text-hi);
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+}
+
+.create-form input:focus,
+.create-form select:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
+}
+
+.create-form select {
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+}
+
+/* --- Buttons --- */
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn--admin {
+  background: var(--amber);
+  color: #0F1418;
+}
+.btn--admin:hover:not(:disabled) { filter: brightness(1.08); }
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  color: var(--text-mid);
+}
+.btn--ghost:hover:not(:disabled) {
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.btn--danger {
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  color: #E0645A;
+}
+.btn--danger:hover:not(:disabled) {
+  border-color: #E0645A;
+  background: rgba(224, 100, 90, 0.10);
+}
+
+.btn--sm {
+  padding: 7px 12px;
+  font-size: 12.5px;
+  border-radius: 7px;
+}
+
+/* --- Filter row (items section) --- */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.filter-row label {
+  font-size: 12.5px;
+  color: var(--text-mid);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.filter-row select {
+  background: var(--panel);
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-hi);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  outline: none;
+}
+
+/* --- Tables --- */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ink-line);
+  border-radius: 12px;
+}
+
+table.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.admin-table thead th {
+  text-align: left;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--text-low);
+  font-weight: 600;
+  padding: 12px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--ink-line);
+  white-space: nowrap;
+}
+
+.admin-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ink-line);
+  color: var(--text-hi);
+  vertical-align: middle;
+}
+
+.admin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.row-empty td {
+  text-align: center;
+  color: var(--text-low);
+  padding: 28px 14px;
+  font-style: normal;
+}
+
+.cell-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.cell-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-low);
+  margin-top: 2px;
+}
+
+/* --- Inline-editable table cells --- */
+.edit-inline {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13.5px;
+  color: var(--text-hi);
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.edit-inline:hover {
+  border-color: var(--ink-line);
+}
+
+.edit-inline:focus {
+  border-color: var(--amber);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.18);
+}
+
+select.edit-inline {
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  cursor: pointer;
+}
+
+select.edit-inline:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* --- Pills (status badges) --- */
+.pill {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pill--active { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
+.pill--inactive { background: rgba(110, 117, 128, 0.18); color: var(--text-low); }
+.pill--available { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
+.pill--borrowed { background: rgba(232, 163, 61, 0.18); color: var(--amber); }
+
+/* --- Teacher tag edit row --- */
+.tag-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag-input {
+  background: var(--panel);
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-hi);
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+  width: 160px;
+}
+
+.tag-input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
+}
+
+/* --- Assignment quota hint --- */
+.quota-hint {
+  font-size: 12px;
+  color: var(--text-low);
+  margin-top: 4px;
+  min-height: 16px;
+}
+
+/* --- Toast --- */
+.admin-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--panel);
+  border: 1px solid var(--ink-line);
+  color: var(--text-hi);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 100;
+}
+
+.admin-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.admin-toast.ok { border-color: var(--teal); }
+.admin-toast.error { border-color: #E0645A; }
+
+/* --- Accessibility --- */
+.admin-nav-btn:focus-visible,
+.btn:focus-visible,
+.edit-inline:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-toast { transition: none; }
+}
+
+/* --- จอแคบ: sidebar กลายเป็นแถบบน + เมนูเลื่อนแนวนอน --- */
+@media (max-width: 880px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--ink-line);
+    padding: 20px 16px;
+  }
+
+  .admin-brand { margin-bottom: 16px; }
+
+  .admin-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+
+  .admin-nav-btn {
+    flex-shrink: 0;
+  }
+
+  .admin-sidebar-footer {
+    margin-top: 16px;
+    padding-top: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px dashed var(--ink-line);
+  }
+
+  .admin-user-name { margin: 0; }
+  .logout-btn { width: auto; padding: 8px 16px; }
+
+  .admin-main {
+    padding: 24px 18px 48px;
+  }
+
+  .create-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .create-form .field { flex: 1 1 auto; }
+}

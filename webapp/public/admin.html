@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>แอดมิน — ระบบยืม-คืนอุปกรณ์ RFID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+
+  <div class="admin-shell">
+
+    <!-- ============== Sidebar ============== -->
+    <aside class="admin-sidebar">
+      <div class="admin-brand">
+        <div class="admin-brand-eyebrow">ACCESS PASS · ADMIN</div>
+        <h1 class="admin-brand-title">ระบบยืม–คืน<br />อุปกรณ์ RFID</h1>
+      </div>
+
+      <ul class="admin-nav">
+        <li>
+          <button class="admin-nav-btn is-active" data-section="rooms">
+            <span class="admin-nav-index">01</span>
+            ห้อง / กุญแจ
+          </button>
+        </li>
+        <li>
+          <button class="admin-nav-btn" data-section="items">
+            <span class="admin-nav-index">02</span>
+            ของในห้อง
+          </button>
+        </li>
+        <li>
+          <button class="admin-nav-btn" data-section="teachers">
+            <span class="admin-nav-index">03</span>
+            แท็กครู
+          </button>
+        </li>
+        <li>
+          <button class="admin-nav-btn" data-section="assignments">
+            <span class="admin-nav-index">04</span>
+            มอบหมายดูแลห้อง
+          </button>
+        </li>
+      </ul>
+
+      <div class="admin-sidebar-footer">
+        <p class="admin-user-name">เข้าสู่ระบบในฐานะแอดมิน</p>
+        <button id="logout-btn" class="logout-btn">ออกจากระบบ</button>
+      </div>
+    </aside>
+
+    <!-- ============== Main content ============== -->
+    <main class="admin-main">
+
+      <div class="admin-header">
+        <div class="admin-header-eyebrow" id="section-eyebrow">SECTION 01</div>
+        <h2 class="admin-header-title" id="section-title">ห้อง / กุญแจ</h2>
+      </div>
+
+      <!-- ================= SECTION 01: ห้อง / กุญแจ ================= -->
+      <section class="admin-section is-active" data-section-panel="rooms">
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">เพิ่มห้อง / กุญแจใหม่</h3>
+          <form id="form-room-create" class="create-form">
+            <div class="field">
+              <label for="room-name">ชื่อห้อง</label>
+              <input type="text" id="room-name" name="roomName" placeholder="เช่น A309" required />
+            </div>
+            <div class="field">
+              <label for="room-tag">เลขแท็ก RFID (ไม่บังคับ)</label>
+              <input type="text" id="room-tag" name="tagUid" placeholder="เช่น 04A1B2C3" />
+            </div>
+            <div class="field">
+              <label for="room-desc">คำอธิบาย (ไม่บังคับ)</label>
+              <input type="text" id="room-desc" name="description" placeholder="เช่น ห้องปฏิบัติการวิทย์" />
+            </div>
+            <button type="submit" class="btn btn--admin">เพิ่มห้อง</button>
+          </form>
+        </div>
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">รายการห้อง / กุญแจทั้งหมด</h3>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ชื่อห้อง</th>
+                  <th>เลขแท็ก RFID</th>
+                  <th>คำอธิบาย</th>
+                  <th>สถานะ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="rooms-tbody">
+                <tr class="row-empty"><td colspan="5">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= SECTION 02: ของในห้อง ================= -->
+      <section class="admin-section" data-section-panel="items">
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">เพิ่มของในห้อง</h3>
+          <form id="form-item-create" class="create-form">
+            <div class="field">
+              <label for="item-room">ห้อง</label>
+              <select id="item-room" name="roomTagId" required>
+                <option value="">— เลือกห้อง —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="item-name">ชื่อของ</label>
+              <input type="text" id="item-name" name="itemName" placeholder="เช่น รีโมทโปรเจกเตอร์" required />
+            </div>
+            <button type="submit" class="btn btn--admin">เพิ่มของ</button>
+          </form>
+        </div>
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">รายการของทั้งหมด</h3>
+
+          <div class="filter-row">
+            <label for="item-filter-room">กรองตามห้อง</label>
+            <select id="item-filter-room">
+              <option value="">ทุกห้อง</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ชื่อของ</th>
+                  <th>ห้อง</th>
+                  <th>สถานะ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="items-tbody">
+                <tr class="row-empty"><td colspan="4">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= SECTION 03: แท็กครู ================= -->
+      <section class="admin-section" data-section-panel="teachers">
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">แท็กครูทั้งหมด</h3>
+          <p class="quota-hint" style="margin-bottom: 16px;">
+            ครูสมัครบัญชีเองที่หน้าเข้าสู่ระบบ — แอดมินมีหน้าที่ผูก/แก้ไขเลขแท็ก RFID ให้แต่ละคนที่นี่
+          </p>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ชื่อ–นามสกุล</th>
+                  <th>แผนก/กลุ่มสาระ</th>
+                  <th>รหัสครู</th>
+                  <th>เลขแท็ก RFID</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="teachers-tbody">
+                <tr class="row-empty"><td colspan="5">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= SECTION 04: มอบหมายดูแลห้อง ================= -->
+      <section class="admin-section" data-section-panel="assignments">
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">มอบหมายครูดูแลห้อง</h3>
+          <form id="form-assignment-create" class="create-form">
+            <div class="field">
+              <label for="assign-teacher">ครู</label>
+              <select id="assign-teacher" name="teacherId" required>
+                <option value="">— เลือกครู —</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="assign-room">ห้อง</label>
+              <select id="assign-room" name="roomTagId" required>
+                <option value="">— เลือกห้อง —</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn--admin">มอบหมาย</button>
+          </form>
+          <div id="assign-quota-hint" class="quota-hint"></div>
+        </div>
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">รายการมอบหมายทั้งหมด</h3>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ครู</th>
+                  <th>ห้อง</th>
+                  <th>มอบหมายเมื่อ</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="assignments-tbody">
+                <tr class="row-empty"><td colspan="4">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="admin-toast" role="status" aria-live="polite"></div>
+
+<script src="/js/admin.js"></script>
+</body>
+</html>

@@ -8,3 +8,6 @@ winget install OpenJS.NodeJS.LTS
 cd webapp
 npm install
 npm start
+
+มีคำสั่งใหม่ด้วย
+npm install jsonwebtoken

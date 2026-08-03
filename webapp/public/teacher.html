@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>หน้าครู — ระบบยืม-คืนอุปกรณ์ RFID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="/css/teacher.css" />
+</head>
+<body>
+
+  <div class="teacher-shell">
+
+    <header class="teacher-topbar">
+      <div>
+        <div class="teacher-brand-eyebrow">ACCESS PASS · TEACHER</div>
+        <h1 class="teacher-brand-title">คิวอนุมัติ &amp; รายการของ</h1>
+      </div>
+
+      <div class="teacher-user-block">
+        <div class="teacher-user-name">
+          <strong id="user-name">—</strong>
+          <span id="user-meta"></span>
+        </div>
+        <button id="logout-btn" class="logout-btn">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <main class="teacher-main">
+
+      <!-- ============== คิวอนุมัติ (เฉพาะห้องที่ตัวเองดูแล) ============== -->
+      <section>
+        <h2 class="teacher-section-title">คำขอที่รออนุมัติ</h2>
+        <p class="teacher-section-sub">เฉพาะคำขอของห้อง/กุญแจที่คุณมีสิทธิ์ดูแลเท่านั้น</p>
+        <div id="approval-queue" class="approval-queue">
+          <div class="empty-state empty-state--queue">กำลังโหลด...</div>
+        </div>
+      </section>
+
+      <!-- ============== รายการของทั้งหมด (ยืม-คืนได้เอง) ============== -->
+      <section>
+        <h2 class="teacher-section-title">ของทั้งหมดในระบบ</h2>
+        <p class="teacher-section-sub">เลือกของที่ต้องการยืม หรือกดคืนของที่คุณถืออยู่</p>
+
+        <div class="filter-row">
+          <label for="search-input">ค้นหา</label>
+          <input type="text" id="search-input" placeholder="ค้นหาชื่อของหรือห้อง..." />
+
+          <label for="status-filter">สถานะ</label>
+          <select id="status-filter">
+            <option value="">ทั้งหมด</option>
+            <option value="available">ว่าง</option>
+            <option value="borrowed">ถูกยืมอยู่</option>
+          </select>
+        </div>
+
+        <div id="items-grid" class="items-grid">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="teacher-toast" role="status" aria-live="polite"></div>
+
+<script src="/js/teacher.js"></script>
+</body>
+</html>
