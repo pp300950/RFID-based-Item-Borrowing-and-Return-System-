@@ -5,8 +5,9 @@
      --ink        #1C2128   พื้นหลังหลัก โทนกราไฟต์เข้ม
      --panel      #262B33   พื้นการ์ด
      --panel-2    #2E343D   พื้นช่อง input
-     --teal       #3E9C8F   accent หลัก (แท็ก/สแกน)
-     --amber      #E8A33D   accent รอง (แอดมิน/ไฮไลต์)
+     --teal       #3E9C8F   accent หลัก (นักเรียน/แท็ก/สแกน)
+     --amber      #E8A33D   accent แอดมิน
+     --violet     #8B7FD1   accent ครู
      --ink-line   #3A4048   เส้นแบ่ง/ขอบ
      --text-hi    #EDEDED   ตัวอักษรหลัก
      --text-mid   #AEB4BC   ตัวอักษรรอง
@@ -19,6 +20,10 @@
    Signature: การ์ดทรง "บัตรผ่าน" (access pass) มีเส้นปรุแบบตั๋วคั่นระหว่าง
    ส่วนหัวกับฟอร์ม และจุดวงกลมกะพริบข้างปุ่มเข้าสู่ระบบสื่อถึงจังหวะ
    "แตะบัตร" ที่เครื่องอ่าน RFID
+
+   Layout (จอกว้าง): 2 คอลัมน์ — ฝั่งซ้ายเป็น brand panel อธิบาย flow
+   การแตะแท็ก 3 ขั้นตอน ฝั่งขวาเป็นการ์ดฟอร์มเดิม พับกลับเป็นคอลัมน์
+   เดียว (แสดงแค่การ์ดฟอร์ม) บนจอแคบ/มือถือ
    ================================================================= */
 
 * { box-sizing: border-box; }
@@ -29,6 +34,7 @@
   --panel-2: #2E343D;
   --teal: #3E9C8F;
   --amber: #E8A33D;
+  --violet: #8B7FD1;
   --ink-line: #3A4048;
   --text-hi: #EDEDED;
   --text-mid: #AEB4BC;
@@ -55,15 +61,115 @@ html, body {
     var(--ink);
 }
 
-.pass-card {
+/* --- โครงหลัก 2 คอลัมน์ --- */
+.layout {
   width: 100%;
-  max-width: 420px;
+  max-width: 940px;
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 0;
   background: var(--panel);
   border: 1px solid var(--ink-line);
   border-radius: 18px;
-  padding: 32px 28px 24px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+
+/* --- ฝั่งซ้าย: brand panel (เฉพาะจอกว้าง) --- */
+.brand-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 44px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(62,156,143,0.14), transparent 45%),
+    radial-gradient(circle at 90% 85%, rgba(139,127,209,0.10), transparent 50%),
+    var(--panel);
+  border-right: 1px solid var(--ink-line);
+}
+
+.brand-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--teal);
+  margin-bottom: 16px;
+}
+
+.brand-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+
+.brand-sub {
+  font-size: 14px;
+  color: var(--text-mid);
+  line-height: 1.6;
+  max-width: 36ch;
+  margin: 0 0 36px;
+}
+
+.brand-steps {
+  list-style: none;
+  margin: 0 0 40px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.brand-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.step-index {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--teal);
+  border: 1px solid var(--ink-line);
+  border-radius: 6px;
+  padding: 3px 7px;
+  flex-shrink: 0;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-hi);
+}
+
+.step-desc {
+  font-size: 12.5px;
+  color: var(--text-mid);
+  margin-top: 2px;
+}
+
+.brand-footer {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px dashed var(--ink-line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* --- ฝั่งขวา: การ์ดฟอร์ม --- */
+.pass-card {
+  background: var(--panel);
+  padding: 40px 32px 28px;
   position: relative;
+}
+
+.pass-header--mobile-only,
+.pass-footer--mobile-only {
+  display: none;
 }
 
 .pass-header {
@@ -87,14 +193,8 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-.pass-sub {
-  font-size: 13.5px;
-  color: var(--text-mid);
-  line-height: 1.5;
-}
-
-/* --- แท็บเลือกบทบาท --- */
-.tab-row {
+/* --- แท็บเลือกบทบาท (นักเรียน / ครู / แอดมิน) --- */
+.role-row {
   display: flex;
   background: var(--panel-2);
   border-radius: 10px;
@@ -103,13 +203,13 @@ html, body {
   margin-bottom: 20px;
 }
 
-.tab-btn {
+.role-btn {
   flex: 1;
   border: none;
   background: transparent;
   color: var(--text-mid);
   font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   padding: 10px 0;
   border-radius: 7px;
@@ -117,19 +217,15 @@ html, body {
   transition: background 0.18s ease, color 0.18s ease;
 }
 
-.tab-btn.is-active {
-  background: var(--teal);
-  color: #0F1418;
-}
-
-#tab-admin.is-active {
-  background: var(--amber);
-}
+.role-btn.is-active { color: #0F1418; }
+.role-btn[data-role="student"].is-active { background: var(--teal); }
+.role-btn[data-role="teacher"].is-active { background: var(--violet); }
+.role-btn[data-role="admin"].is-active { background: var(--amber); }
 
 /* --- เส้นปรุแบบตั๋ว --- */
 .perforation {
   height: 1px;
-  margin: 0 -28px 20px;
+  margin: 0 -32px 20px;
   background-image: repeating-linear-gradient(
     to right,
     var(--ink-line) 0,
@@ -140,8 +236,49 @@ html, body {
   position: relative;
 }
 
+/* --- แผงแต่ละบทบาท --- */
+.role-panel { display: none; }
+.role-panel.is-active { display: block; }
+
+/* --- แท็บย่อย เข้าสู่ระบบ / สร้างบัญชี --- */
+.mode-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--ink-line);
+}
+
+.mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-low);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 4px 10px;
+  margin-right: 18px;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.mode-btn::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.mode-btn.is-active { color: var(--text-hi); }
+
+[data-role-panel="student"] .mode-btn.is-active::after { background: var(--teal); }
+[data-role-panel="teacher"] .mode-btn.is-active::after { background: var(--violet); }
+
 /* --- ฟอร์ม --- */
-.pass-form.is-hidden { display: none; }
+.mode-form { display: none; }
+.mode-form.is-active { display: block; }
 
 .field { margin-bottom: 16px; }
 
@@ -179,6 +316,11 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(62,156,143,0.22);
 }
 
+[data-role-panel="teacher"] input:focus {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px rgba(139,127,209,0.22);
+}
+
 #form-admin input:focus {
   border-color: var(--amber);
   box-shadow: 0 0 0 3px rgba(232,163,61,0.22);
@@ -214,6 +356,7 @@ input:focus {
 .submit-btn:active { transform: scale(0.98); }
 
 .submit-btn--admin { background: var(--amber); }
+.submit-btn--teacher { background: var(--violet); }
 
 .scan-dot {
   width: 8px;
@@ -240,13 +383,11 @@ input:focus {
 .status-msg.error { color: #E0645A; }
 
 /* --- footer --- */
-.pass-footer {
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px dashed var(--ink-line);
+.pass-footer,
+.brand-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
 .stamp {
@@ -258,6 +399,7 @@ input:focus {
   border-radius: 5px;
   padding: 3px 7px;
   transform: rotate(-3deg);
+  flex-shrink: 0;
 }
 
 .footer-text {
@@ -277,8 +419,22 @@ input:focus-visible {
   .scan-dot { animation: none; }
 }
 
-/* --- Mobile --- */
+/* --- จอแคบ / มือถือ: กลับไปเป็นคอลัมน์เดียว ซ่อน brand panel --- */
+@media (max-width: 860px) {
+  .layout {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+  }
+  .brand-panel { display: none; }
+  .pass-header--mobile-only,
+  .pass-footer--mobile-only {
+    display: flex;
+  }
+  .pass-header--mobile-only { display: block; }
+  .pass-card { padding: 32px 28px 24px; }
+}
+
 @media (max-width: 420px) {
-  .pass-card { padding: 26px 20px 20px; border-radius: 14px; }
+  .pass-card { padding: 26px 20px 20px; }
   .pass-title { font-size: 21px; }
 }

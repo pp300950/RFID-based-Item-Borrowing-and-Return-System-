@@ -1,0 +1,14 @@
+# อย่า commit ไฟล์คีย์ลับเด็ดขาด
+.env
+
+# Node
+node_modules/
+npm-debug.log
+
+# ระบบปฏิบัติการ
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
