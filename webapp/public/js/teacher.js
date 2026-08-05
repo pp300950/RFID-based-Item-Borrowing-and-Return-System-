@@ -1,12 +1,12 @@
 // public/js/teacher.js
 // -----------------------------------------------------------------
-// หน้าครู: รวม 2 อย่างในหน้าเดียว
-//   1. คิวอนุมัติ — GET /api/transactions/pending (backend กรองมาให้
-//      เฉพาะห้องที่ครูคนนี้มีสิทธิ์ดูแลอยู่แล้ว ผ่าน teacher_room_assignments)
-//      -> POST /api/transactions/:id/approve หรือ /reject
-//   2. รายการของทั้งหมด — ยืม/คืนของตัวเองได้เหมือนนักเรียน
-//      GET /api/items, POST /api/borrow, POST /api/return,
-//      POST /api/transactions/:id/cancel (ยกเลิกคำขอของตัวเอง)
+// หน้าครู (เวอร์ชันใหม่ — read-only):
+//   1. สถานะกุญแจทั้งหมด — GET /api/keys/status (ว่าง/ถูกยืม + ใครยืมอยู่)
+//   2. ประวัติการยืม-คืนของตัวเอง — GET /api/keys/history/mine (50 ล่าสุด)
+//
+// ครูไม่ยืม-คืนผ่านเว็บอีกต่อไป — flow จริงคือแตะแท็กประจำตัวที่เครื่องอ่าน
+// หน้าห้องทะเบียน แล้วแตะแท็กกุญแจ (ดู routes/tap.js ฝั่ง backend) หน้านี้
+// จึงใช้แค่ "ดู" สถานะปัจจุบันเท่านั้น ไม่มีปุ่มยืม/คืน/อนุมัติใดๆ
 //
 // ใช้ JWT จาก localStorage คีย์ "token" เหมือนหน้าอื่นๆ ทั้งหมด
 // ไม่ได้ใช้ framework ใดๆ — vanilla DOM + fetch
@@ -71,7 +71,6 @@ async function apiFetch(url, options = {}) {
 }
 
 const apiGet = (url) => apiFetch(url);
-const apiPost = (url, body) => apiFetch(url, { method: "POST", body: JSON.stringify(body || {}) });
 
 // -------------------------------------------------------------
 // Toast
@@ -97,6 +96,18 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
+function formatDateTime(iso) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("th-TH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch (e) {
+    return iso;
+  }
+}
+
 // -------------------------------------------------------------
 // ผู้ใช้ปัจจุบัน (ถอดจาก JWT payload: { role, id, name })
 // -------------------------------------------------------------
@@ -120,150 +131,35 @@ document.getElementById("logout-btn").addEventListener("click", () => {
 });
 
 // =================================================================
-// SECTION 1 — คิวอนุมัติ
-// =================================================================
-
-const approvalQueueEl = document.getElementById("approval-queue");
-
-async function loadApprovalQueue() {
-  const { ok, data } = await apiGet("/api/transactions/pending");
-
-  if (!ok) {
-    approvalQueueEl.innerHTML = `<div class="empty-state empty-state--queue">${escapeHtml(
-      data.message || "โหลดรายการที่รออนุมัติไม่สำเร็จ"
-    )}</div>`;
-    return;
-  }
-
-  renderApprovalQueue(data.transactions || []);
-}
-
-function renderApprovalQueue(transactions) {
-  if (transactions.length === 0) {
-    approvalQueueEl.innerHTML = `<div class="empty-state empty-state--queue">ไม่มีคำขอรออนุมัติในห้องที่คุณดูแลอยู่ตอนนี้</div>`;
-    return;
-  }
-
-  approvalQueueEl.innerHTML = transactions
-    .map((t) => {
-      const item = t.room_items || {};
-      const roomName = item.room_tags ? item.room_tags.room_name : "—";
-      const isBorrowAction = t.action === "borrow";
-
-      const requester =
-        t.requested_by_type === "student"
-          ? t.requested_by_student
-          : t.requested_by_teacher;
-
-      const requesterName = requester ? requester.name : "—";
-      const requesterExtra =
-        t.requested_by_type === "student" && requester
-          ? ` · ห้อง ${escapeHtml(requester.room || "—")} เลขที่ ${escapeHtml(requester.seat_no || "—")}`
-          : t.requested_by_type === "teacher" && requester && requester.department
-          ? ` · ${escapeHtml(requester.department)}`
-          : "";
-
-      return `
-        <div class="approval-card" data-txn-id="${t.id}">
-          <div class="approval-info">
-            <span class="approval-dot" aria-hidden="true"></span>
-            <div class="approval-text">
-              <div class="approval-item-name">
-                <span class="approval-action-label">${isBorrowAction ? "ขอยืม" : "ขอคืน"}</span>
-                ${escapeHtml(item.item_name || "—")}
-              </div>
-              <div class="approval-meta">ห้อง ${escapeHtml(roomName)} · ผู้ขอ: ${escapeHtml(requesterName)}${requesterExtra}</div>
-            </div>
-          </div>
-          <div class="approval-buttons">
-            <button class="btn btn--approve" data-action="approve" data-id="${t.id}">อนุมัติ</button>
-            <button class="btn btn--reject" data-action="reject" data-id="${t.id}">ปฏิเสธ</button>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-approvalQueueEl.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-action]");
-  if (!btn) return;
-
-  const action = btn.dataset.action; // "approve" | "reject"
-  const txnId = btn.dataset.id;
-  const card = btn.closest(".approval-card");
-  const buttons = card.querySelectorAll("button");
-
-  buttons.forEach((b) => (b.disabled = true));
-
-  const { ok, data } = await apiPost(`/api/transactions/${txnId}/${action}`);
-
-  if (ok) {
-    showToast(action === "approve" ? "อนุมัติคำขอแล้ว" : "ปฏิเสธคำขอแล้ว", "ok");
-    await loadApprovalQueue();
-    await loadItems();
-  } else {
-    showToast(data.message || "ดำเนินการไม่สำเร็จ", "error");
-    buttons.forEach((b) => (b.disabled = false));
-  }
-});
-
-// =================================================================
-// SECTION 2 — รายการของทั้งหมด (ยืม-คืนของตัวเอง)
+// SECTION 1 — สถานะกุญแจทั้งหมด
 // =================================================================
 
 const itemsGridEl = document.getElementById("items-grid");
 const searchInput = document.getElementById("search-input");
 const statusFilter = document.getElementById("status-filter");
 
-let allItems = [];
-let myPendingItemIds = new Set(); // ของที่ตัวเองมีคำขอ pending ค้างอยู่ (ไม่ว่า borrow/return)
-let myPendingByItemId = new Map(); // itemId -> transactionId (ของตัวเอง) ใช้ตอนกดยกเลิก
+let allKeys = [];
 
-async function loadItems() {
-  const { ok, data } = await apiGet("/api/items");
+async function loadKeysStatus() {
+  const { ok, data } = await apiGet("/api/keys/status");
 
   if (!ok) {
-    itemsGridEl.innerHTML = `<div class="empty-state">${escapeHtml(data.message || "โหลดรายการของไม่สำเร็จ")}</div>`;
+    itemsGridEl.innerHTML = `<div class="empty-state">${escapeHtml(data.message || "โหลดสถานะกุญแจไม่สำเร็จ")}</div>`;
     return;
   }
 
-  allItems = data.items || [];
-  await loadMyPending();
+  allKeys = data.keys || [];
   renderItemsGrid();
 }
 
-// ครูก็เห็นเฉพาะคำขอของตัวเองใน /transactions/pending (แม้ backend จะกรอง
-// ตามห้องที่ดูแลให้ในคิวอนุมัติด้านบน — แต่ endpoint เดียวกันนี้ใช้คนละ
-// วัตถุประสงค์ จึงต้องกรองเฉพาะ requested_by_teacher_id ตรงกับตัวเองอีกชั้น
-// เพื่อเอามาแสดงสถานะ "รออนุมัติ" บนการ์ดของที่ตัวเองขอไว้)
-async function loadMyPending() {
-  myPendingItemIds = new Set();
-  myPendingByItemId = new Map();
-
-  if (!currentUser) return;
-
-  const { ok, data } = await apiGet("/api/transactions/pending");
-  if (!ok) return;
-
-  (data.transactions || []).forEach((t) => {
-    const isMine = t.requested_by_type === "teacher" && t.requested_by_teacher_id === currentUser.id;
-    if (isMine && t.room_item_id) {
-      myPendingItemIds.add(String(t.room_item_id));
-      myPendingByItemId.set(String(t.room_item_id), t.id);
-    }
-  });
-}
-
-function matchesFilters(item) {
+function matchesFilters(key) {
   const q = searchInput.value.trim().toLowerCase();
   const statusVal = statusFilter.value;
 
-  if (statusVal && item.status !== statusVal) return false;
+  if (statusVal && key.status !== statusVal) return false;
 
   if (q) {
-    const roomName = item.room_tags ? item.room_tags.room_name : "";
-    const haystack = `${item.item_name} ${roomName}`.toLowerCase();
+    const haystack = `${key.room_name} ${key.description || ""}`.toLowerCase();
     if (!haystack.includes(q)) return false;
   }
 
@@ -271,26 +167,20 @@ function matchesFilters(item) {
 }
 
 function renderItemsGrid() {
-  const filtered = allItems.filter(matchesFilters);
+  const filtered = allKeys.filter(matchesFilters);
 
   if (filtered.length === 0) {
-    itemsGridEl.innerHTML = `<div class="empty-state">ไม่พบของที่ตรงกับเงื่อนไข</div>`;
+    itemsGridEl.innerHTML = `<div class="empty-state">ไม่พบกุญแจที่ตรงกับเงื่อนไข</div>`;
     return;
   }
 
   itemsGridEl.innerHTML = filtered.map(renderItemCard).join("");
 }
 
-function renderItemCard(item) {
-  const roomName = item.room_tags ? item.room_tags.room_name : "—";
-  const isBorrowed = item.status === "borrowed";
-  const hasMyPending = myPendingItemIds.has(String(item.id));
-
+function renderItemCard(key) {
+  const isBorrowed = key.status === "borrowed";
   const isMineBorrowed =
-    isBorrowed &&
-    item.borrowed_by_type === "teacher" &&
-    currentUser &&
-    item.borrowed_by_teacher_id === currentUser.id;
+    isBorrowed && currentUser && key.borrowed_by && key.borrowed_by.id === currentUser.id;
 
   let pillClass = "pill--available";
   let pillLabel = "ว่าง";
@@ -299,46 +189,22 @@ function renderItemCard(item) {
     pillLabel = isMineBorrowed ? "คุณยืมอยู่" : "ถูกยืมอยู่";
   }
 
-  let actionHtml;
-
-  if (hasMyPending) {
-    const txnId = myPendingByItemId.get(String(item.id));
-    actionHtml = `
-      <div class="item-card-action">
-        <button class="btn btn--disabled-state" disabled>รออนุมัติ...</button>
-        <button class="btn btn--cancel" data-action="cancel" data-txn-id="${txnId}" style="margin-top: 6px;">ยกเลิกคำขอ</button>
-      </div>
-    `;
-  } else if (!isBorrowed) {
-    actionHtml = `
-      <div class="item-card-action">
-        <button class="btn btn--borrow" data-action="borrow" data-item-id="${item.id}">ขอยืม</button>
-      </div>
-    `;
-  } else if (isMineBorrowed) {
-    actionHtml = `
-      <div class="item-card-action">
-        <button class="btn btn--return" data-action="return" data-item-id="${item.id}">ขอคืน</button>
-      </div>
-    `;
-  } else {
-    actionHtml = `
-      <div class="item-card-action">
-        <button class="btn btn--disabled-state" disabled>ถูกยืมอยู่</button>
-      </div>
-    `;
-  }
+  const holderName = isBorrowed && key.borrowed_by ? key.borrowed_by.name : null;
 
   return `
-    <div class="item-card" data-item-id="${item.id}">
+    <div class="item-card" data-key-id="${key.id}">
       <div class="item-card-top">
         <div>
-          <div class="item-name">${escapeHtml(item.item_name)}</div>
-          <div class="item-room">ห้อง ${escapeHtml(roomName)}</div>
+          <div class="item-name">${escapeHtml(key.room_name)}</div>
+          ${key.description ? `<div class="item-room">${escapeHtml(key.description)}</div>` : ""}
         </div>
         <span class="pill ${pillClass}">${pillLabel}</span>
       </div>
-      ${actionHtml}
+      ${
+        isBorrowed && holderName
+          ? `<div class="item-card-meta">ยืมอยู่โดยคุณครู ${escapeHtml(holderName)}</div>`
+          : ""
+      }
     </div>
   `;
 }
@@ -346,44 +212,47 @@ function renderItemCard(item) {
 searchInput.addEventListener("input", renderItemsGrid);
 statusFilter.addEventListener("change", renderItemsGrid);
 
-itemsGridEl.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-action]");
-  if (!btn) return;
+// =================================================================
+// SECTION 2 — ประวัติการยืม-คืนของฉัน
+// =================================================================
 
-  const action = btn.dataset.action;
+const historyTbody = document.getElementById("history-tbody");
 
-  if (action === "borrow" || action === "return") {
-    const itemId = btn.dataset.itemId;
-    btn.disabled = true;
+async function loadMyHistory() {
+  const { ok, data } = await apiGet("/api/keys/history/mine");
 
-    const endpoint = action === "borrow" ? "/api/borrow" : "/api/return";
-    const { ok, data } = await apiPost(endpoint, { roomItemId: itemId });
-
-    if (ok) {
-      showToast(action === "borrow" ? "ส่งคำขอยืมแล้ว รอครูอนุมัติ" : "ส่งคำขอคืนแล้ว รอครูอนุมัติ", "ok");
-      await loadItems();
-    } else {
-      showToast(data.message || "ดำเนินการไม่สำเร็จ", "error");
-      btn.disabled = false;
-    }
+  if (!ok) {
+    historyTbody.innerHTML = `<tr class="row-empty"><td colspan="3">${escapeHtml(
+      data.message || "โหลดประวัติไม่สำเร็จ"
+    )}</td></tr>`;
     return;
   }
 
-  if (action === "cancel") {
-    const txnId = btn.dataset.txnId;
-    btn.disabled = true;
+  renderHistoryTable(data.logs || []);
+}
 
-    const { ok, data } = await apiPost(`/api/transactions/${txnId}/cancel`);
-
-    if (ok) {
-      showToast("ยกเลิกคำขอแล้ว", "ok");
-      await loadItems();
-    } else {
-      showToast(data.message || "ยกเลิกไม่สำเร็จ", "error");
-      btn.disabled = false;
-    }
+function renderHistoryTable(logs) {
+  if (logs.length === 0) {
+    historyTbody.innerHTML = `<tr class="row-empty"><td colspan="3">ยังไม่มีประวัติการยืม-คืน</td></tr>`;
+    return;
   }
-});
+
+  historyTbody.innerHTML = logs
+    .map((log) => {
+      const roomName = log.room_tags ? log.room_tags.room_name : "—";
+      const actionLabel = log.action === "borrow" ? "ยืม" : "คืน";
+      const actionClass = log.action === "borrow" ? "pill--borrowed" : "pill--available";
+
+      return `
+        <tr>
+          <td>${escapeHtml(roomName)}</td>
+          <td><span class="pill ${actionClass}">${actionLabel}</span></td>
+          <td>${escapeHtml(formatDateTime(log.acted_at))}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
 
 // =================================================================
 // Init
@@ -395,6 +264,6 @@ itemsGridEl.addEventListener("click", async (e) => {
     return;
   }
   initUserBlock();
-  await loadApprovalQueue();
-  await loadItems();
+  await loadKeysStatus();
+  await loadMyHistory();
 })();

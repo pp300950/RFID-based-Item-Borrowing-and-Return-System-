@@ -28,21 +28,21 @@
           </button>
         </li>
         <li>
-          <button class="admin-nav-btn" data-section="items">
-            <span class="admin-nav-index">02</span>
-            ของในห้อง
-          </button>
-        </li>
-        <li>
           <button class="admin-nav-btn" data-section="teachers">
-            <span class="admin-nav-index">03</span>
+            <span class="admin-nav-index">02</span>
             แท็กครู
           </button>
         </li>
         <li>
-          <button class="admin-nav-btn" data-section="assignments">
+          <button class="admin-nav-btn" data-section="keys">
+            <span class="admin-nav-index">03</span>
+            สถานะกุญแจ
+          </button>
+        </li>
+        <li>
+          <button class="admin-nav-btn" data-section="history">
             <span class="admin-nav-index">04</span>
-            มอบหมายดูแลห้อง
+            ประวัติยืม-คืน
           </button>
         </li>
       </ul>
@@ -105,33 +105,21 @@
 
       </section>
 
-      <!-- ================= SECTION 02: ของในห้อง ================= -->
-      <section class="admin-section" data-section-panel="items">
+      <!-- ================= SECTION 03: สถานะกุญแจ ================= -->
+      <section class="admin-section" data-section-panel="keys">
 
         <div class="admin-card">
-          <h3 class="admin-card-title">เพิ่มของในห้อง</h3>
-          <form id="form-item-create" class="create-form">
-            <div class="field">
-              <label for="item-room">ห้อง</label>
-              <select id="item-room" name="roomTagId" required>
-                <option value="">— เลือกห้อง —</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="item-name">ชื่อของ</label>
-              <input type="text" id="item-name" name="itemName" placeholder="เช่น รีโมทโปรเจกเตอร์" required />
-            </div>
-            <button type="submit" class="btn btn--admin">เพิ่มของ</button>
-          </form>
-        </div>
-
-        <div class="admin-card">
-          <h3 class="admin-card-title">รายการของทั้งหมด</h3>
+          <h3 class="admin-card-title">สถานะกุญแจปัจจุบัน</h3>
+          <p class="quota-hint" style="margin-bottom: 16px;">
+            แสดงสถานะกุญแจทุกดอก (มาจาก room_tags โดยตรง) — ว่าง / ถูกยืมอยู่ และใครยืมอยู่
+          </p>
 
           <div class="filter-row">
-            <label for="item-filter-room">กรองตามห้อง</label>
-            <select id="item-filter-room">
-              <option value="">ทุกห้อง</option>
+            <label for="keys-filter-status">กรองตามสถานะ</label>
+            <select id="keys-filter-status">
+              <option value="">ทั้งหมด</option>
+              <option value="available">ว่าง</option>
+              <option value="borrowed">ถูกยืมอยู่</option>
             </select>
           </div>
 
@@ -139,13 +127,51 @@
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>ชื่อของ</th>
-                  <th>ห้อง</th>
+                  <th>ชื่อห้อง/กุญแจ</th>
+                  <th>เลขแท็ก RFID</th>
                   <th>สถานะ</th>
-                  <th>จัดการ</th>
+                  <th>ยืมอยู่โดย</th>
+                  <th>ยืมเมื่อ</th>
                 </tr>
               </thead>
-              <tbody id="items-tbody">
+              <tbody id="keys-tbody">
+                <tr class="row-empty"><td colspan="5">กำลังโหลด...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= SECTION 04: ประวัติยืม-คืน ================= -->
+      <section class="admin-section" data-section-panel="history">
+
+        <div class="admin-card">
+          <h3 class="admin-card-title">ประวัติการยืม-คืนทั้งหมด</h3>
+          <p class="quota-hint" style="margin-bottom: 16px;">
+            รายการล่าสุดของทุกกุญแจและทุกครู (จาก key_logs) — แตะแท็กที่เครื่องอ่านหน้าห้องทะเบียนแล้วบันทึกอัตโนมัติ
+          </p>
+
+          <div class="filter-row">
+            <label for="history-filter-action">กรองตามการกระทำ</label>
+            <select id="history-filter-action">
+              <option value="">ทั้งหมด</option>
+              <option value="borrow">ยืม</option>
+              <option value="return">คืน</option>
+            </select>
+          </div>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ห้อง/กุญแจ</th>
+                  <th>ครู</th>
+                  <th>การกระทำ</th>
+                  <th>เวลา</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
                 <tr class="row-empty"><td colspan="4">กำลังโหลด...</td></tr>
               </tbody>
             </table>
@@ -175,50 +201,6 @@
               </thead>
               <tbody id="teachers-tbody">
                 <tr class="row-empty"><td colspan="5">กำลังโหลด...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-      </section>
-
-      <!-- ================= SECTION 04: มอบหมายดูแลห้อง ================= -->
-      <section class="admin-section" data-section-panel="assignments">
-
-        <div class="admin-card">
-          <h3 class="admin-card-title">มอบหมายครูดูแลห้อง</h3>
-          <form id="form-assignment-create" class="create-form">
-            <div class="field">
-              <label for="assign-teacher">ครู</label>
-              <select id="assign-teacher" name="teacherId" required>
-                <option value="">— เลือกครู —</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="assign-room">ห้อง</label>
-              <select id="assign-room" name="roomTagId" required>
-                <option value="">— เลือกห้อง —</option>
-              </select>
-            </div>
-            <button type="submit" class="btn btn--admin">มอบหมาย</button>
-          </form>
-          <div id="assign-quota-hint" class="quota-hint"></div>
-        </div>
-
-        <div class="admin-card">
-          <h3 class="admin-card-title">รายการมอบหมายทั้งหมด</h3>
-          <div class="table-wrap">
-            <table class="admin-table">
-              <thead>
-                <tr>
-                  <th>ครู</th>
-                  <th>ห้อง</th>
-                  <th>มอบหมายเมื่อ</th>
-                  <th>จัดการ</th>
-                </tr>
-              </thead>
-              <tbody id="assignments-tbody">
-                <tr class="row-empty"><td colspan="4">กำลังโหลด...</td></tr>
               </tbody>
             </table>
           </div>

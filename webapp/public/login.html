@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>เข้าสู่ระบบ — ระบบยืม-คืนอุปกรณ์ RFID</title>
+<title>เข้าสู่ระบบ — ระบบยืม-คืนกุญแจ RFID</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css" />
@@ -16,22 +16,22 @@
       <!-- ฝั่งซ้าย: branding / ภาพรวมระบบ (ซ่อนบนจอแคบ) -->
       <aside class="brand-panel">
         <div class="brand-eyebrow">ACCESS PASS · SYSTEM ENTRY</div>
-        <h1 class="brand-title">ระบบยืม–คืน<br />อุปกรณ์ด้วยบัตร RFID</h1>
-        <p class="brand-sub">แตะบัตรที่เครื่องอ่าน หรือเข้าสู่ระบบด้วยฟอร์มด้านขวาตามบทบาทของคุณ</p>
+        <h1 class="brand-title">ระบบยืม–คืน<br />กุญแจด้วยบัตร RFID</h1>
+        <p class="brand-sub">แตะแท็กครูแล้วแตะแท็กกุญแจที่เครื่องอ่านหน้างานเพื่อยืม/คืน หรือเข้าสู่ระบบด้วยฟอร์มด้านขวาเพื่อดูสถานะ</p>
 
         <ol class="brand-steps">
           <li>
             <span class="step-index">01</span>
             <div>
               <div class="step-title">ครูแตะแท็กประจำตัว</div>
-              <div class="step-desc">ระบบยืนยันตัวผู้อนุญาต</div>
+              <div class="step-desc">ระบบยืนยันตัวผู้ยืม/คืน</div>
             </div>
           </li>
           <li>
             <span class="step-index">02</span>
             <div>
-              <div class="step-title">แตะแท็กห้อง/กุญแจ</div>
-              <div class="step-desc">จับคู่เป็นรายการยืมหรือคืน</div>
+              <div class="step-title">แตะแท็กกุญแจ</div>
+              <div class="step-desc">ยืมหรือคืนสำเร็จทันที</div>
             </div>
           </li>
           <li>
@@ -54,71 +54,18 @@
 
         <div class="pass-header pass-header--mobile-only">
           <div class="pass-eyebrow">ACCESS PASS · SYSTEM ENTRY</div>
-          <h1 class="pass-title">ระบบยืม–คืนอุปกรณ์</h1>
+          <h1 class="pass-title">ระบบยืม–คืนกุญแจ</h1>
         </div>
 
         <div class="role-row" role="tablist">
-          <button class="role-btn is-active" data-role="student" role="tab" aria-selected="true">นักเรียน</button>
-          <button class="role-btn" data-role="teacher" role="tab" aria-selected="false">ครู</button>
+          <button class="role-btn is-active" data-role="teacher" role="tab" aria-selected="true">ครู</button>
           <button class="role-btn" data-role="admin" role="tab" aria-selected="false">แอดมิน</button>
         </div>
 
         <div class="perforation" aria-hidden="true"></div>
 
-        <!-- ================= นักเรียน ================= -->
-        <section class="role-panel is-active" data-role-panel="student">
-          <div class="mode-row" role="tablist">
-            <button class="mode-btn is-active" data-mode="login" role="tab" aria-selected="true">เข้าสู่ระบบ</button>
-            <button class="mode-btn" data-mode="register" role="tab" aria-selected="false">สร้างบัญชี</button>
-          </div>
-
-          <!-- นักเรียน: เข้าสู่ระบบ -->
-          <form id="form-student-login" class="pass-form mode-form is-active" data-mode-form="login" autocomplete="off">
-            <div class="field">
-              <label for="sl-code">รหัสประจำตัวนักเรียน</label>
-              <input type="text" id="sl-code" name="studentCode" placeholder="เช่น 69319011766" inputmode="numeric" required />
-              <div class="field-hint">กรอกรหัสเดิมที่เคยสมัครไว้เพื่อเข้าสู่ระบบ</div>
-            </div>
-
-            <button type="submit" class="submit-btn">
-              <span class="scan-dot" aria-hidden="true"></span>
-              เข้าสู่ระบบ
-            </button>
-          </form>
-
-          <!-- นักเรียน: สร้างบัญชี -->
-          <form id="form-student-register" class="pass-form mode-form" data-mode-form="register" autocomplete="off">
-            <div class="field">
-              <label for="sr-name">ชื่อ–นามสกุล</label>
-              <input type="text" id="sr-name" name="name" placeholder="เช่น ด.ช. สมชาย ใจดี" required />
-            </div>
-
-            <div class="field-row">
-              <div class="field">
-                <label for="sr-room">ห้อง</label>
-                <input type="text" id="sr-room" name="room" placeholder="เช่น A309" required />
-              </div>
-              <div class="field">
-                <label for="sr-seat">เลขที่</label>
-                <input type="text" id="sr-seat" name="seatNo" placeholder="เช่น 12" required />
-              </div>
-            </div>
-
-            <div class="field">
-              <label for="sr-code">รหัสประจำตัวนักเรียน</label>
-              <input type="text" id="sr-code" name="studentCode" placeholder="เช่น 69319011766" inputmode="numeric" required />
-              <div class="field-hint">ต้องขึ้นต้นด้วย 693190 และมีทั้งหมด 11 หลัก</div>
-            </div>
-
-            <button type="submit" class="submit-btn">
-              <span class="scan-dot" aria-hidden="true"></span>
-              สร้างบัญชี
-            </button>
-          </form>
-        </section>
-
         <!-- ================= ครู ================= -->
-        <section class="role-panel" data-role-panel="teacher">
+        <section class="role-panel is-active" data-role-panel="teacher">
           <div class="mode-row" role="tablist">
             <button class="mode-btn is-active" data-mode="login" role="tab" aria-selected="true">เข้าสู่ระบบ</button>
             <button class="mode-btn" data-mode="register" role="tab" aria-selected="false">สร้างบัญชี</button>

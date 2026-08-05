@@ -127,3 +127,76 @@ item_status          -- สถานะปัจจุบันของแต�
 - ตั้ง Basic Auth หรือ token ป้องกันการเข้าถึงแดชบอร์ดผ่าน ngrok โดยไม่ได้รับอนุญาต
 - MySQL ควรตั้งรหัสผ่าน (ค่า default XAMPP มักไม่มีรหัส root)
 - สำรองข้อมูล (backup) ฐานข้อมูลเป็นระยะ เผื่อเครื่องโน้ตบุ๊คมีปัญหา
+
+
+
+
+สถาปัตยกรรมใหม่ (Express + Supabase, สเกลลง)
+แนวคิดหลัก
+ตัดนักเรียนออกทั้งหมด, ตัด "ของ" (room_items) ออก — เหลือแค่ ครู กับ กุญแจ
+ตัด flow pending/approve ออกทั้งหมด — แตะแท็ก = จบทันที (ไม่มี transaction รออนุมัติ)
+ตัด teacher_room_assignments (มอบหมายครูดูแลห้อง) ออก — ครูคนไหนมีแท็กก็ยืมห้องไหนก็ได้
+เพิ่ม endpoint สาธารณะสำหรับเครื่องแตะแท็ก (ไม่ผ่าน JWT เพราะเครื่องอ่านที่ห้องทะเบียนไม่ได้ login เป็นใครคนหนึ่ง — ตัวเครื่องเองก็คือจุดที่ต้องเชื่อถือได้อยู่แล้ว)
+DB Schema ใหม่
+teachers                      -- คงไว้ (ระบบสมัคร/ล็อกอินปกติ)
+├─ id, name, department, teacher_code, created_at, last_login_at
+
+teacher_tags                  -- คงไว้ (1:1 ครู <-> แท็กประจำตัว)
+├─ id, teacher_id (unique), tag_uid (unique), assigned_at
+
+room_tags                     -- คงไว้แต่ตัด "ห้อง" concept ออก ให้เป็น "กุญแจ" ตรงๆ
+├─ id, room_name, tag_uid (unique), description, is_active, created_at
+   -- เพิ่มสถานะปัจจุบันเข้ามาตรงนี้เลย (ไม่ต้องมี room_items อีกชั้น):
+├─ status ('available' | 'borrowed')
+├─ borrowed_by_teacher_id (FK -> teachers, nullable)
+├─ borrowed_at (nullable)
+
+key_logs                      -- ประวัติยืม-คืนทั้งหมด (แทน transactions เดิม)
+├─ id, room_tag_id (FK), teacher_id (FK)
+├─ action ('borrow' | 'return')
+├─ acted_at
+
+-- ตัดออกทั้งหมด: students, room_items, teacher_room_assignments,
+--                 transactions (แบบ pending/approve), access_violation_logs
+
+Logic การแตะ 2 ครั้ง (จุดหัวใจ):
+
+แตะแท็กครู → server หาว่า tag_uid นี้ผูกกับครูคนไหนใน teacher_tags → เก็บ "session ชั่วคราว" (in-memory ฝั่ง server พอ ไม่ต้องมี DB table เพราะเป็น session สั้นๆ ไม่กี่วินาที ใช้ Map<sessionId, {teacherId, timestamp}> + timeout ก็พอ)
+แตะแท็กกุญแจ (ได้หลายดอกต่อเนื่องในหนึ่ง session ครู) → หา room_tags จาก tag_uid → เช็ค status:
+available → update เป็น borrowed + insert key_logs action=borrow
+borrowed โดยครูคนเดียวกับ session → update เป็น available + insert key_logs action=return
+borrowed โดยครูอื่น → ตอบ error "ถูกยืมโดยครูท่านอื่นอยู่" ไม่ทำอะไร
+Route ใหม่
+POST /api/register/teacher     (คงเดิม)
+POST /api/login/teacher        (คงเดิม)
+POST /api/login/admin          (คงเดิม)
+GET  /api/me                   (คงเดิม)
+
+POST /api/tap                  (ใหม่ — endpoint เดียวรับทุกการแตะจากเครื่องอ่าน)
+                                body: { tagUid }
+                                ไม่ต้อง requireAuth (เครื่องอ่านที่ห้องทะเบียนเป็น
+                                จุดเชื่อถือได้ทางกายภาพอยู่แล้ว)
+                                ตอบกลับ state ปัจจุบันของ session (รอแตะกุญแจ /
+                                ยืมสำเร็จ / คืนสำเร็จ / error) ให้หน้าจอแสดงผล
+
+/api/admin/rooms/*              (คงเดิม แต่ตัด tagUid dependency ของ room_items)
+/api/admin/teacher-tags/*       (คงเดิมทั้งหมด)
+GET /api/admin/keys/status      (ใหม่ — กุญแจทั้งหมด + สถานะ + ใครยืมอยู่)
+GET /api/admin/keys/history     (ใหม่ — key_logs ทั้งหมด, filter ได้)
+ไฟล์ที่ต้องลบ
+ไฟล์	เหตุผล
+routes/transactions.js	flow pending/approve ทั้งไฟล์ไม่ใช้แล้ว แทนที่ด้วย routes/tap.js ใหม่
+routes/admin_items.js	room_items ไม่มีแล้ว (กุญแจ = room_tags ตรงๆ)
+routes/admin_assignments.js	ตัดมอบหมายครูดูแลห้องออกตามที่ยืนยัน
+ไฟล์ที่ต้องแก้
+ไฟล์	แก้อะไร
+schema.sql	ลบ students, room_items, teacher_room_assignments, transactions, access_violation_logs, trigger 6 ห้อง — เพิ่ม status/borrowed_by_teacher_id/borrowed_at ใน room_tags, เพิ่มตาราง key_logs
+server.js	ลบ mount transactionRoutes, adminItemsRoutes, adminAssignmentsRoutes — เพิ่ม mount tapRoutes (public, ไม่ผ่าน requireAuth)
+routes/auth.js	ลบ endpoint /register/student, /login/student ทั้งหมด
+routes/admin_rooms.js	แก้ POST/PATCH ให้ไม่ยุ่งกับ tagUid ซ้ำซ้อน (อันนี้จริงๆ ใกล้เคียงเดิมมาก อาจแทบไม่ต้องแก้) + เพิ่ม field status ตอน list
+middleware/auth.js	ไม่ต้องแก้ (requireAuth/requireRole ยังใช้ได้เหมือนเดิมกับครู/แอดมิน)
+routes/admin_teachers.js	ไม่ต้องแก้ (teacher_tags ยังเหมือนเดิมทุกอย่าง)
+ไฟล์ใหม่ที่ต้องสร้าง
+ไฟล์	หน้าที่
+routes/tap.js	endpoint /api/tap รับ tagUid จากเครื่องอ่าน, จัดการ session แตะครู→แตะกุญแจ
+routes/admin_keys.js	/api/admin/keys/status, /api/admin/keys/history

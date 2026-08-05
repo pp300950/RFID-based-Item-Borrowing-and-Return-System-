@@ -1,8 +1,13 @@
 // public/js/admin.js
 // -----------------------------------------------------------------
-// หน้าแอดมิน: ผูกกับ /api/admin/* ทั้งหมด (rooms, items, teacher-tags,
-// assignments) ใช้ JWT จาก localStorage คีย์ "token" (เซ็ตไว้ตอน
+// หน้าแอดมิน: ผูกกับ /api/admin/* ทั้งหมด (rooms, teacher-tags, keys
+// status/history) ใช้ JWT จาก localStorage คีย์ "token" (เซ็ตไว้ตอน
 // login.js เข้าสู่ระบบแอดมินสำเร็จ)
+//
+// เวอร์ชันนี้ตัด "ของในห้อง" (room_items) และ "มอบหมายดูแลห้อง"
+// (teacher_room_assignments) ออกทั้งหมดตามสถาปัตยกรรมใหม่ — กุญแจทุกดอก
+// คือ row เดียวใน room_tags เอง และครูคนไหนมีแท็กก็ยืมห้องไหนก็ได้
+// ไม่ต้อง assign ล่วงหน้า แทนที่ด้วย 2 section ใหม่: สถานะกุญแจ + ประวัติ
 //
 // ไม่ได้ใช้ framework ใดๆ — vanilla DOM + fetch เพื่อให้เบาและ debug ง่าย
 // โครงสร้าง: apiFetch (ผู้ช่วยกลาง) -> loadX()/renderX() ต่อ section ->
@@ -86,9 +91,9 @@ function showToast(message, type) {
 // -------------------------------------------------------------
 const SECTION_META = {
   rooms: { index: "01", title: "ห้อง / กุญแจ" },
-  items: { index: "02", title: "ของในห้อง" },
-  teachers: { index: "03", title: "แท็กครู" },
-  assignments: { index: "04", title: "มอบหมายดูแลห้อง" },
+  teachers: { index: "02", title: "แท็กครู" },
+  keys: { index: "03", title: "สถานะกุญแจ" },
+  history: { index: "04", title: "ประวัติยืม-คืน" },
 };
 
 const navButtons = document.querySelectorAll(".admin-nav-btn");
@@ -98,9 +103,9 @@ const sectionTitle = document.getElementById("section-title");
 
 const LOADERS = {
   rooms: loadRooms,
-  items: loadItemsSection,
   teachers: loadTeacherTags,
-  assignments: loadAssignmentsSection,
+  keys: loadKeysStatus,
+  history: loadKeysHistory,
 };
 
 const loadedOnce = new Set();
@@ -132,7 +137,6 @@ document.getElementById("logout-btn").addEventListener("click", () => {
 // -------------------------------------------------------------
 const state = {
   rooms: [],
-  teachers: [],
 };
 
 function escapeHtml(str) {
@@ -156,49 +160,7 @@ function formatDateTime(iso) {
   }
 }
 
-function fillRoomOptions(selectEl, { includeAllOption } = {}) {
-  const current = selectEl.value;
-  selectEl.innerHTML = "";
 
-  if (includeAllOption) {
-    const optAll = document.createElement("option");
-    optAll.value = "";
-    optAll.textContent = "ทุกห้อง";
-    selectEl.appendChild(optAll);
-  } else {
-    const optPlaceholder = document.createElement("option");
-    optPlaceholder.value = "";
-    optPlaceholder.textContent = "— เลือกห้อง —";
-    selectEl.appendChild(optPlaceholder);
-  }
-
-  state.rooms.forEach((room) => {
-    const opt = document.createElement("option");
-    opt.value = room.id;
-    opt.textContent = room.room_name + (room.is_active === false ? " (ปิดใช้งาน)" : "");
-    selectEl.appendChild(opt);
-  });
-
-  if (current && [...selectEl.options].some((o) => o.value === current)) {
-    selectEl.value = current;
-  }
-}
-
-function fillTeacherOptions(selectEl) {
-  const current = selectEl.value;
-  selectEl.innerHTML = '<option value="">— เลือกครู —</option>';
-
-  state.teachers.forEach((teacher) => {
-    const opt = document.createElement("option");
-    opt.value = teacher.id;
-    opt.textContent = teacher.name + (teacher.department ? ` (${teacher.department})` : "");
-    selectEl.appendChild(opt);
-  });
-
-  if (current && [...selectEl.options].some((o) => o.value === current)) {
-    selectEl.value = current;
-  }
-}
 
 // =================================================================
 // SECTION 01 — ห้อง / กุญแจ
@@ -217,11 +179,6 @@ async function loadRooms() {
 
   state.rooms = data.rooms || [];
   renderRoomsTable();
-
-  // อัปเดต dropdown ทุกที่ที่ผูกกับรายการห้อง
-  fillRoomOptions(document.getElementById("item-room"));
-  fillRoomOptions(document.getElementById("item-filter-room"), { includeAllOption: true });
-  fillRoomOptions(document.getElementById("assign-room"));
 }
 
 function renderRoomsTable() {
@@ -339,9 +296,7 @@ roomsTbody.addEventListener("click", async (e) => {
   if (btn.dataset.action === "delete-room") {
     const room = state.rooms.find((r) => String(r.id) === String(id));
     const label = room ? room.room_name : "ห้องนี้";
-    const confirmed = window.confirm(
-      `ยืนยันลบ "${label}"?\nของและรายการมอบหมายครูในห้องนี้จะถูกลบไปด้วย และกู้คืนไม่ได้`
-    );
+    const confirmed = window.confirm(`ยืนยันลบ "${label}"?\nประวัติการยืม-คืนที่เกี่ยวข้องจะถูกลบไปด้วย และกู้คืนไม่ได้`);
     if (!confirmed) return;
 
     btn.disabled = true;
@@ -357,161 +312,7 @@ roomsTbody.addEventListener("click", async (e) => {
 });
 
 // =================================================================
-// SECTION 02 — ของในห้อง
-// =================================================================
-
-const itemsTbody = document.getElementById("items-tbody");
-const formItemCreate = document.getElementById("form-item-create");
-const itemFilterRoom = document.getElementById("item-filter-room");
-
-async function loadItemsSection() {
-  // ห้องต้องพร้อมก่อน (ใช้ทำ dropdown + แสดงชื่อห้องในตาราง)
-  if (state.rooms.length === 0) {
-    await loadRooms();
-  }
-  await loadItems();
-}
-
-async function loadItems() {
-  const roomTagId = itemFilterRoom.value;
-  const url = roomTagId ? `/api/admin/items?roomTagId=${encodeURIComponent(roomTagId)}` : "/api/admin/items";
-
-  const { ok, data } = await apiGet(url);
-
-  if (!ok) {
-    itemsTbody.innerHTML = `<tr class="row-empty"><td colspan="4">${escapeHtml(data.message || "โหลดข้อมูลไม่สำเร็จ")}</td></tr>`;
-    return;
-  }
-
-  renderItemsTable(data.items || []);
-}
-
-function renderItemsTable(items) {
-  if (items.length === 0) {
-    itemsTbody.innerHTML = `<tr class="row-empty"><td colspan="4">ยังไม่มีของในระบบ — เพิ่มรายการแรกด้านบน</td></tr>`;
-    return;
-  }
-
-  itemsTbody.innerHTML = items
-    .map((item) => {
-      const isBorrowed = item.status === "borrowed";
-      const roomName = item.room_tags ? item.room_tags.room_name : "—";
-
-      const roomSelectOptions = state.rooms
-        .map(
-          (room) =>
-            `<option value="${room.id}" ${String(room.id) === String(item.room_tag_id) ? "selected" : ""}>${escapeHtml(room.room_name)}</option>`
-        )
-        .join("");
-
-      return `
-        <tr data-item-id="${item.id}">
-          <td>
-            <input class="edit-inline" data-field="item_name" value="${escapeHtml(item.item_name)}" ${isBorrowed ? "" : ""} />
-          </td>
-          <td>
-            <select class="edit-inline" data-field="room_tag_id" ${isBorrowed ? "disabled title=\"กำลังถูกยืมอยู่ ย้ายห้องไม่ได้\"" : ""}>
-              ${roomSelectOptions}
-            </select>
-          </td>
-          <td>
-            <span class="pill ${isBorrowed ? "pill--borrowed" : "pill--available"}">${isBorrowed ? "ถูกยืมอยู่" : "ว่าง"}</span>
-          </td>
-          <td class="cell-actions">
-            <button class="btn btn--danger btn--sm" data-action="delete-item" data-id="${item.id}" ${isBorrowed ? "disabled title=\"กำลังถูกยืมอยู่ ลบไม่ได้\"" : ""}>ลบ</button>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-itemFilterRoom.addEventListener("change", loadItems);
-
-formItemCreate.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const submitBtn = formItemCreate.querySelector("button[type=submit]");
-  submitBtn.disabled = true;
-
-  const roomTagId = document.getElementById("item-room").value;
-  const itemName = document.getElementById("item-name").value.trim();
-
-  const { ok, data } = await apiPost("/api/admin/items", { roomTagId, itemName });
-
-  if (ok) {
-    showToast("เพิ่มของสำเร็จ", "ok");
-    document.getElementById("item-name").value = "";
-    await loadItems();
-  } else {
-    showToast(data.message || "เพิ่มของไม่สำเร็จ", "error");
-  }
-
-  submitBtn.disabled = false;
-});
-
-itemsTbody.addEventListener(
-  "blur",
-  async (e) => {
-    if (!e.target.classList || !e.target.classList.contains("edit-inline")) return;
-    if (e.target.tagName === "SELECT") return; // select ใช้ change event แทน
-
-    const row = e.target.closest("tr");
-    const itemId = row.dataset.itemId;
-    const value = e.target.value.trim();
-
-    if (!value) return;
-
-    const { ok, data } = await apiPatch(`/api/admin/items/${itemId}`, { itemName: value });
-
-    if (ok) {
-      showToast("บันทึกการแก้ไขแล้ว", "ok");
-    } else {
-      showToast(data.message || "แก้ไขไม่สำเร็จ", "error");
-      await loadItems();
-    }
-  },
-  true
-);
-
-itemsTbody.addEventListener("change", async (e) => {
-  if (e.target.dataset.field !== "room_tag_id") return;
-
-  const row = e.target.closest("tr");
-  const itemId = row.dataset.itemId;
-  const roomTagId = e.target.value;
-
-  const { ok, data } = await apiPatch(`/api/admin/items/${itemId}`, { roomTagId });
-
-  if (ok) {
-    showToast("ย้ายห้องสำเร็จ", "ok");
-    await loadItems();
-  } else {
-    showToast(data.message || "ย้ายห้องไม่สำเร็จ", "error");
-    await loadItems();
-  }
-});
-
-itemsTbody.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-action='delete-item']");
-  if (!btn) return;
-
-  const id = btn.dataset.id;
-  const confirmed = window.confirm("ยืนยันลบของชิ้นนี้? กู้คืนไม่ได้");
-  if (!confirmed) return;
-
-  btn.disabled = true;
-  const { ok, data } = await apiDelete(`/api/admin/items/${id}`);
-  if (ok) {
-    showToast("ลบของแล้ว", "ok");
-    await loadItems();
-  } else {
-    showToast(data.message || "ลบไม่สำเร็จ", "error");
-    btn.disabled = false;
-  }
-});
-
-// =================================================================
-// SECTION 03 — แท็กครู
+// SECTION 02 — แท็กครู
 // =================================================================
 
 const teachersTbody = document.getElementById("teachers-tbody");
@@ -525,11 +326,6 @@ async function loadTeacherTags() {
   }
 
   const teachers = data.teachers || [];
-
-  // เก็บไว้ใช้ dropdown ของ section มอบหมาย (teacher_tags เป็น array ใน response)
-  state.teachers = teachers.map((t) => ({ id: t.id, name: t.name, department: t.department }));
-  fillTeacherOptions(document.getElementById("assign-teacher"));
-
   renderTeachersTable(teachers);
 }
 
@@ -616,119 +412,106 @@ teachersTbody.addEventListener("click", async (e) => {
 });
 
 // =================================================================
-// SECTION 04 — มอบหมายครูดูแลห้อง
+// SECTION 03 — สถานะกุญแจ
 // =================================================================
 
-const assignmentsTbody = document.getElementById("assignments-tbody");
-const formAssignmentCreate = document.getElementById("form-assignment-create");
-const assignTeacherSelect = document.getElementById("assign-teacher");
-const assignQuotaHint = document.getElementById("assign-quota-hint");
+const keysTbody = document.getElementById("keys-tbody");
+const keysFilterStatus = document.getElementById("keys-filter-status");
 
-async function loadAssignmentsSection() {
-  if (state.rooms.length === 0) await loadRooms();
-  if (state.teachers.length === 0) await loadTeacherTags();
-  fillRoomOptions(document.getElementById("assign-room"));
-  fillTeacherOptions(assignTeacherSelect);
-  await loadAssignments();
-}
+let allKeysCache = [];
 
-async function loadAssignments() {
-  const { ok, data } = await apiGet("/api/admin/assignments");
+async function loadKeysStatus() {
+  const { ok, data } = await apiGet("/api/admin/keys/status");
 
   if (!ok) {
-    assignmentsTbody.innerHTML = `<tr class="row-empty"><td colspan="4">${escapeHtml(data.message || "โหลดข้อมูลไม่สำเร็จ")}</td></tr>`;
+    keysTbody.innerHTML = `<tr class="row-empty"><td colspan="5">${escapeHtml(data.message || "โหลดสถานะกุญแจไม่สำเร็จ")}</td></tr>`;
     return;
   }
 
-  renderAssignmentsTable(data.assignments || []);
+  allKeysCache = data.keys || [];
+  renderKeysTable();
 }
 
-function renderAssignmentsTable(assignments) {
-  if (assignments.length === 0) {
-    assignmentsTbody.innerHTML = `<tr class="row-empty"><td colspan="4">ยังไม่มีการมอบหมายครูดูแลห้อง</td></tr>`;
+function renderKeysTable() {
+  const filterVal = keysFilterStatus.value;
+  const filtered = filterVal ? allKeysCache.filter((k) => k.status === filterVal) : allKeysCache;
+
+  if (filtered.length === 0) {
+    keysTbody.innerHTML = `<tr class="row-empty"><td colspan="5">ไม่พบกุญแจที่ตรงกับเงื่อนไข</td></tr>`;
     return;
   }
 
-  assignmentsTbody.innerHTML = assignments
-    .map((a) => {
-      const teacherName = a.teachers ? a.teachers.name : "—";
-      const teacherDept = a.teachers && a.teachers.department ? a.teachers.department : "";
-      const roomName = a.room_tags ? a.room_tags.room_name : "—";
+  keysTbody.innerHTML = filtered
+    .map((key) => {
+      const isBorrowed = key.status === "borrowed";
+      const holderName = isBorrowed && key.borrowed_by ? key.borrowed_by.name : "—";
 
       return `
         <tr>
+          <td>${escapeHtml(key.room_name)}</td>
+          <td>${escapeHtml(key.tag_uid || "ยังไม่ผูกแท็ก")}</td>
           <td>
-            ${escapeHtml(teacherName)}
-            ${teacherDept ? `<span class="cell-sub">${escapeHtml(teacherDept)}</span>` : ""}
+            <span class="pill ${isBorrowed ? "pill--borrowed" : "pill--available"}">
+              ${isBorrowed ? "ถูกยืมอยู่" : "ว่าง"}
+            </span>
           </td>
-          <td>${escapeHtml(roomName)}</td>
-          <td>${escapeHtml(formatDateTime(a.assigned_at))}</td>
-          <td class="cell-actions">
-            <button class="btn btn--danger btn--sm" data-action="delete-assignment" data-id="${a.id}">ถอดออก</button>
-          </td>
+          <td>${escapeHtml(holderName)}</td>
+          <td>${isBorrowed ? escapeHtml(formatDateTime(key.borrowed_at)) : "—"}</td>
         </tr>
       `;
     })
     .join("");
 }
 
-async function refreshQuotaHint() {
-  const teacherId = assignTeacherSelect.value;
-  if (!teacherId) {
-    assignQuotaHint.textContent = "";
+keysFilterStatus.addEventListener("change", renderKeysTable);
+
+// =================================================================
+// SECTION 04 — ประวัติยืม-คืน
+// =================================================================
+
+const historyTbody = document.getElementById("history-tbody");
+const historyFilterAction = document.getElementById("history-filter-action");
+
+async function loadKeysHistory() {
+  const action = historyFilterAction.value;
+  const url = action ? `/api/admin/keys/history?action=${encodeURIComponent(action)}` : "/api/admin/keys/history";
+
+  const { ok, data } = await apiGet(url);
+
+  if (!ok) {
+    historyTbody.innerHTML = `<tr class="row-empty"><td colspan="4">${escapeHtml(data.message || "โหลดประวัติไม่สำเร็จ")}</td></tr>`;
     return;
   }
 
-  const { ok, data } = await apiGet(`/api/admin/assignments/teacher/${teacherId}/room-count`);
-  if (ok) {
-    assignQuotaHint.textContent = `ครูคนนี้ดูแลอยู่ ${data.count}/${data.max} ห้อง`;
-  } else {
-    assignQuotaHint.textContent = "";
-  }
+  renderHistoryTable(data.logs || []);
 }
 
-assignTeacherSelect.addEventListener("change", refreshQuotaHint);
-
-formAssignmentCreate.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const submitBtn = formAssignmentCreate.querySelector("button[type=submit]");
-  submitBtn.disabled = true;
-
-  const teacherId = assignTeacherSelect.value;
-  const roomTagId = document.getElementById("assign-room").value;
-
-  const { ok, data } = await apiPost("/api/admin/assignments", { teacherId, roomTagId });
-
-  if (ok) {
-    showToast("มอบหมายสำเร็จ", "ok");
-    document.getElementById("assign-room").value = "";
-    await loadAssignments();
-    await refreshQuotaHint();
-  } else {
-    showToast(data.message || "มอบหมายไม่สำเร็จ", "error");
+function renderHistoryTable(logs) {
+  if (logs.length === 0) {
+    historyTbody.innerHTML = `<tr class="row-empty"><td colspan="4">ยังไม่มีประวัติการยืม-คืน</td></tr>`;
+    return;
   }
 
-  submitBtn.disabled = false;
-});
+  historyTbody.innerHTML = logs
+    .map((log) => {
+      const roomName = log.room_tags ? log.room_tags.room_name : "—";
+      const teacherName = log.teachers ? log.teachers.name : "—";
+      const actionLabel = log.action === "borrow" ? "ยืม" : "คืน";
+      const actionClass = log.action === "borrow" ? "pill--borrowed" : "pill--available";
 
-assignmentsTbody.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-action='delete-assignment']");
-  if (!btn) return;
+      return `
+        <tr>
+          <td>${escapeHtml(roomName)}</td>
+          <td>${escapeHtml(teacherName)}</td>
+          <td><span class="pill ${actionClass}">${actionLabel}</span></td>
+          <td>${escapeHtml(formatDateTime(log.acted_at))}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
 
-  const confirmed = window.confirm("ยืนยันถอดครูออกจากการดูแลห้องนี้?");
-  if (!confirmed) return;
-
-  btn.disabled = true;
-  const { ok, data } = await apiDelete(`/api/admin/assignments/${btn.dataset.id}`);
-  if (ok) {
-    showToast("ถอดครูออกจากห้องแล้ว", "ok");
-    await loadAssignments();
-    await refreshQuotaHint();
-  } else {
-    showToast(data.message || "ถอดออกไม่สำเร็จ", "error");
-    btn.disabled = false;
-  }
-});
+historyFilterAction.addEventListener("change", loadKeysHistory);
 
 // =================================================================
 // Init

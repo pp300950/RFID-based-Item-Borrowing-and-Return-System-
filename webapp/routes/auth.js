@@ -1,26 +1,17 @@
 // routes/auth.js
+// -----------------------------------------------------------------
+// เหลือแค่ ครู + แอดมิน (ตัดนักเรียนออกทั้งหมดตามสถาปัตยกรรมใหม่ —
+// ระบบนี้ไม่มีนักเรียนเข้าใช้งานเว็บแล้ว มีแค่ครูที่ยืม-คืนกุญแจผ่าน
+// การแตะแท็กจริงที่เครื่องอ่าน ไม่ใช่ผ่านฟอร์มเว็บ)
+// -----------------------------------------------------------------
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabaseClient");
-const { signToken, requireAuth } = require("../middleware/auth");
-
-// รหัสนักเรียนต้องขึ้นต้นด้วย 693190 และมีความยาวรวม 11 หลัก
-// (ตัวอย่างจากสเปก: 69319011766)
-const STUDENT_CODE_PREFIX = "693190";
-const STUDENT_CODE_LENGTH = 11;
+const { signToken, requireAuth } = require("./middleware_auth");
 
 // รหัสครู: ไม่บังคับ prefix เฉพาะ แต่ต้องเป็นตัวเลข 6-12 หลัก
-// (ปรับได้ภายหลังตามรูปแบบรหัสครูจริงของโรงเรียน)
 const TEACHER_CODE_MIN_LENGTH = 6;
 const TEACHER_CODE_MAX_LENGTH = 12;
-
-function isValidStudentCode(code) {
-  if (typeof code !== "string") return false;
-  if (code.length !== STUDENT_CODE_LENGTH) return false;
-  if (!code.startsWith(STUDENT_CODE_PREFIX)) return false;
-  if (!/^\d+$/.test(code)) return false; // ต้องเป็นตัวเลขล้วน
-  return true;
-}
 
 function isValidTeacherCode(code) {
   if (typeof code !== "string") return false;
@@ -30,135 +21,12 @@ function isValidTeacherCode(code) {
 }
 
 // =================================================================
-// นักเรียน
-// =================================================================
-
-// -------------------------------------------------------------
-// POST /api/register/student
-// body: { name, room, seatNo, studentCode }
-// - สร้างบัญชีใหม่เท่านั้น ถ้ามี student_code นี้อยู่แล้วจะ error
-//   แจ้งให้ไปหน้าเข้าสู่ระบบแทน (ไม่ auto-login ทับ)
-// -------------------------------------------------------------
-router.post("/register/student", async (req, res) => {
-  const { name, room, seatNo, studentCode } = req.body;
-
-  if (!name || !room || !seatNo || !studentCode) {
-    return res.status(400).json({ ok: false, message: "กรุณากรอกข้อมูลให้ครบทุกช่อง" });
-  }
-
-  if (!isValidStudentCode(studentCode)) {
-    return res.status(400).json({
-      ok: false,
-      message: `รหัสประจำตัวนักเรียนไม่ถูกต้อง ต้องขึ้นต้นด้วย ${STUDENT_CODE_PREFIX} และมีทั้งหมด ${STUDENT_CODE_LENGTH} หลัก`,
-    });
-  }
-
-  try {
-    const { data: existing, error: findError } = await supabase
-      .from("students")
-      .select("id")
-      .eq("student_code", studentCode)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (existing) {
-      return res.status(409).json({
-        ok: false,
-        message: "รหัสประจำตัวนักเรียนนี้เคยสมัครไว้แล้ว กรุณาไปที่แท็บเข้าสู่ระบบแทน",
-      });
-    }
-
-    const { data: created, error: insertError } = await supabase
-      .from("students")
-      .insert({
-        name,
-        room,
-        seat_no: seatNo,
-        student_code: studentCode,
-        last_login_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
-
-    const token = signToken({ role: "student", id: created.id, name: created.name });
-
-    return res.json({ ok: true, student: created, token });
-  } catch (err) {
-    console.error("Student register error:", err.message);
-    return res.status(500).json({
-      ok: false,
-      message: "เชื่อมต่อฐานข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง หรือเช็คว่าตั้งค่าคีย์ Supabase ถูกต้องหรือยัง",
-    });
-  }
-});
-
-// -------------------------------------------------------------
-// POST /api/login/student
-// body: { studentCode }
-// - เข้าสู่ระบบด้วยรหัสประจำตัวนักเรียนอย่างเดียว ไม่สร้างบัญชีใหม่
-// -------------------------------------------------------------
-router.post("/login/student", async (req, res) => {
-  const { studentCode } = req.body;
-
-  if (!studentCode) {
-    return res.status(400).json({ ok: false, message: "กรุณากรอกรหัสประจำตัวนักเรียน" });
-  }
-
-  if (!isValidStudentCode(studentCode)) {
-    return res.status(400).json({
-      ok: false,
-      message: `รหัสประจำตัวนักเรียนไม่ถูกต้อง ต้องขึ้นต้นด้วย ${STUDENT_CODE_PREFIX} และมีทั้งหมด ${STUDENT_CODE_LENGTH} หลัก`,
-    });
-  }
-
-  try {
-    const { data: existing, error: findError } = await supabase
-      .from("students")
-      .select("*")
-      .eq("student_code", studentCode)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (!existing) {
-      return res.status(404).json({
-        ok: false,
-        message: "ไม่พบบัญชีนี้ในระบบ กรุณาสมัครสมาชิกก่อนที่แท็บสร้างบัญชี",
-      });
-    }
-
-    const { data: updated, error: updateError } = await supabase
-      .from("students")
-      .update({ last_login_at: new Date().toISOString() })
-      .eq("id", existing.id)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    const token = signToken({ role: "student", id: updated.id, name: updated.name });
-
-    return res.json({ ok: true, student: updated, token });
-  } catch (err) {
-    console.error("Student login error:", err.message);
-    return res.status(500).json({
-      ok: false,
-      message: "เชื่อมต่อฐานข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง หรือเช็คว่าตั้งค่าคีย์ Supabase ถูกต้องหรือยัง",
-    });
-  }
-});
-
-// =================================================================
 // ครู
 // =================================================================
 
 // -------------------------------------------------------------
 // POST /api/register/teacher
 // body: { name, department, teacherCode }
-// - สร้างบัญชีครูใหม่เท่านั้น ถ้ามี teacher_code นี้อยู่แล้วจะ error
 // -------------------------------------------------------------
 router.post("/register/teacher", async (req, res) => {
   const { name, department, teacherCode } = req.body;
@@ -218,8 +86,6 @@ router.post("/register/teacher", async (req, res) => {
 // -------------------------------------------------------------
 // POST /api/login/teacher
 // body: { teacherCode }
-// - เข้าสู่ระบบด้วยรหัสครูอย่างเดียว ไม่สร้างบัญชีใหม่
-//   (ในอนาคตจะรองรับการแตะแท็ก RFID แทนได้ด้วย โดยไม่กระทบ endpoint นี้)
 // -------------------------------------------------------------
 router.post("/login/teacher", async (req, res) => {
   const { teacherCode } = req.body;
@@ -279,7 +145,7 @@ router.post("/login/teacher", async (req, res) => {
 // -------------------------------------------------------------
 // POST /api/login/admin
 // body: { username, password }
-// - เทียบกับค่าที่ตั้งไว้ใน environment variable เท่านั้น (ไม่มีในฐานข้อมูล)
+// เทียบกับค่าที่ตั้งไว้ใน environment variable เท่านั้น (ไม่มีในฐานข้อมูล)
 // -------------------------------------------------------------
 router.post("/login/admin", (req, res) => {
   const { username, password } = req.body;
@@ -291,7 +157,6 @@ router.post("/login/admin", (req, res) => {
   }
 
   if (username === validUsername && password === validPassword) {
-    // แอดมินไม่มีแถวในฐานข้อมูล ใช้ role อย่างเดียวเป็น identity ใน token
     const token = signToken({ role: "admin", id: null, name: "admin" });
     return res.json({ ok: true, role: "admin", token });
   }
@@ -301,8 +166,6 @@ router.post("/login/admin", (req, res) => {
 
 // -------------------------------------------------------------
 // GET /api/me
-// ตรวจสอบ token ปัจจุบันว่ายัง valid อยู่ไหม พร้อมส่งข้อมูล role/id/name
-// กลับไป — ฝั่ง frontend ใช้เช็คตอนโหลดหน้าที่ต้อง login ก่อนเข้า
 // -------------------------------------------------------------
 router.get("/me", requireAuth, (req, res) => {
   return res.json({ ok: true, user: req.user });

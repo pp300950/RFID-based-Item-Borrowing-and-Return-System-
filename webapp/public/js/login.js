@@ -8,7 +8,7 @@ const rolePanels = document.querySelectorAll(".role-panel");
 const modeButtons = document.querySelectorAll(".mode-btn");
 
 // -------------------------------------------------------------
-// สลับบทบาท (นักเรียน / ครู / แอดมิน)
+// สลับบทบาท (ครู / แอดมิน)
 // -------------------------------------------------------------
 function switchRole(role) {
   roleButtons.forEach((btn) => {
@@ -123,32 +123,6 @@ function completeLogin(data, redirectTo) {
     window.location.href = redirectTo;
   }, REDIRECT_DELAY_MS);
 }
-
-// --- นักเรียน: เข้าสู่ระบบ ---
-bindForm("form-student-login", {
-  endpoint: "/api/login/student",
-  buildPayload: (form) => ({
-    studentCode: form.querySelector("#sl-code").value.trim(),
-  }),
-  onSuccess: (data) => {
-    showStatus(`✅ เข้าสู่ระบบสำเร็จ: ${data.student.name}`, "ok");
-    completeLogin(data, "/student.html");
-  },
-});
-
-// --- นักเรียน: สร้างบัญชี ---
-bindForm("form-student-register", {
-  endpoint: "/api/register/student",
-  buildPayload: (form) => ({
-    name: form.querySelector("#sr-name").value.trim(),
-    room: form.querySelector("#sr-room").value.trim(),
-    seatNo: form.querySelector("#sr-seat").value.trim(),
-    studentCode: form.querySelector("#sr-code").value.trim(),
-  }),
-  onSuccess: (data) => {
-    showStatus(`✅ สร้างบัญชีสำเร็จ: ${data.student.name} — ไปที่แท็บเข้าสู่ระบบได้เลย`, "ok");
-  },
-});
 
 // --- ครู: เข้าสู่ระบบ ---
 bindForm("form-teacher-login", {
