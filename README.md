@@ -1,202 +1,240 @@
-# ระบบยืม–คืนอุปกรณ์ด้วยบัตร RFID (R80CP)
+# ระบบยืม–คืนกุญแจด้วยแท็ก RFID
 
-## 1. ภาพรวมระบบ
+ระบบยืม-คืนกุญแจห้อง สำหรับครู โดยใช้เครื่องอ่านแท็ก RFID (Keyboard Emulation)
+ที่ห้องทะเบียน — แตะแท็กครู แล้วแตะแท็กกุญแจ ระบบจะยืม/คืนให้อัตโนมัติ
+ไม่ต้องมีขั้นตอนอนุมัติ
 
-ระบบนี้ใช้เครื่องอ่านบัตร RFID รุ่น **R80CP** ซึ่งทำงานแบบ **Keyboard Emulation** (จำลองตัวเองเป็นคีย์บอร์ด USB) เสียบเข้ากับโน้ตบุ๊คเครื่องเดียว วางไว้ที่จุดยืม-คืน แล้วใช้เว็บแอปที่รันบนเครื่องนั้น (ผ่าน XAMPP) เป็นตัวรับข้อมูลและประมวลผล พร้อมเปิดให้ดูแดชบอร์ดจากนอกวง LAN ผ่าน ngrok
-
-**Flow การใช้งานหลัก**
-1. ครูแตะแท็กประจำตัวครู 1 ครั้ง → ระบบรู้ว่า "ใครเป็นเจ้าของ/ผู้อนุญาต"
-2. แตะแท็กที่สอง (แท็กประจำห้อง/แท็กกุญแจ) → ระบบจับคู่ 2 แท็กนี้เป็น 1 รายการ แล้วบันทึกเป็นการยืม (หรือคืน ถ้ามีรายการยืมค้างอยู่)
-3. หน้าจอ/เว็บแสดงผลทันทีว่า "ยืมสำเร็จ" หรือ "คืนสำเร็จ"
+**สแต็กที่ใช้จริง:** Node.js (Express) + Supabase (Postgres) + JWT + Render (hosting)
 
 ---
 
-## 2. สถาปัตยกรรมระบบ
+## 1. ภาพรวมการทำงาน
+
+**Flow หลัก (ที่เครื่องอ่านแท็ก ห้องทะเบียน)**
+
+1. ครูแตะแท็กประจำตัว 1 ครั้ง → ระบบเปิด "session" ชั่วคราวผูกกับครูคนนั้น
+2. แตะแท็กกุญแจ (ยืมได้หลายดอกต่อเนื่องในรอบเดียว) → ระบบเช็คสถานะกุญแจ:
+   - ว่างอยู่ (`available`) → บันทึกเป็นการ **ยืม**
+   - ถูกยืมอยู่โดยครูคนเดียวกับ session → บันทึกเป็นการ **คืน**
+   - ถูกยืมอยู่โดยครูคนอื่น → แจ้ง error ไม่ทำอะไร
+3. Session หมดอายุอัตโนมัติถ้าไม่แตะกุญแจต่อภายใน 20 วินาที (แตะแท็กครูใหม่เพื่อเริ่ม session ใหม่ได้เสมอ)
+
+**สถาปัตยกรรมระบบ**
 
 ```
-[แท็ก RFID] --แตะ--> [เครื่องอ่าน R80CP (USB, HID Keyboard)]
+[แท็ก RFID] --แตะ--> [เครื่องอ่าน RFID (USB, HID Keyboard)]
+                              |
+                    พิมพ์เลขแท็กลง <input> อัตโนมัติ
                               |
                               v
-                    [โน้ตบุ๊ค: หน้าเว็บ (Browser)]
+                 [หน้าเว็บ public/ (Browser)]
                               |
-                    พิมพ์ตัวเลขบัตรลง <input> อัตโนมัติ
-                              |
-                              v
-                [XAMPP บนโน้ตบุ๊คเครื่องเดียวกัน]
-                 - Apache (PHP) รับข้อมูล/ประมวลผล logic ยืม-คืน
-                 - MySQL เก็บข้อมูลแท็ก, รายการยืม-คืน, log
+                    ยิง POST /api/tap
                               |
                               v
-                     [ngrok tunnel (http 80)]
+              [Express Server (server.js + routes/)]
                               |
                               v
-              [แดชบอร์ดเว็บ เข้าดูได้จากนอกเน็ตวง LAN]
+                    [Supabase (Postgres)]
 ```
 
-**สรุปบทบาทอุปกรณ์**
-| ส่วน | หน้าที่ |
+---
+
+## 2. โครงสร้างโปรเจกต์
+
+```
+webapp/
+├─ server.js                   # entry point, mount ทุก route
+├─ package.json
+├─ .env                        # ค่าจริง (ไม่ commit ขึ้น git)
+├─ .env.example                # ตัวอย่าง placeholder เท่านั้น
+├─ config/
+│  └─ supabaseClient.js        # สร้าง Supabase client จาก env
+├─ routes/
+│  ├─ auth.js                  # สมัคร/ล็อกอินครู, ล็อกอินแอดมิน, /me
+│  ├─ middleware_auth.js       # JWT: signToken, requireAuth, requireRole
+│  ├─ tap.js                   # POST /api/tap (endpoint หลักของเครื่องอ่าน)
+│  ├─ keys.js                  # ครูดูสถานะกุญแจ + ประวัติของตัวเอง
+│  ├─ admin_rooms.js           # แอดมิน CRUD ห้อง/กุญแจ
+│  ├─ admin_teachers.js        # แอดมิน assign แท็กให้ครู
+│  └─ admin_keys.js            # แอดมินดูสถานะ/ประวัติกุญแจทั้งหมด
+├─ public/                     # frontend (static files)
+└─ sql/                        # schema.sql
+```
+
+> **หมายเหตุ:** `middleware_auth.js` อยู่ใน `routes/` ไม่ใช่โฟลเดอร์ `middleware/`
+> แยกต่างหาก ดังนั้นไฟล์อื่นใน `routes/` ที่จะ import ต้องใช้
+> `require("./middleware_auth")` (ไม่ใช่ `require("../middleware/auth")`)
+
+---
+
+## 3. Database Schema (Supabase / Postgres)
+
+```
+teachers
+├─ id, name, department, teacher_code, created_at, last_login_at
+
+teacher_tags                  -- 1:1 ครู <-> แท็กประจำตัว
+├─ id, teacher_id (unique, FK -> teachers), tag_uid (unique), assigned_at
+
+room_tags                     -- "กุญแจ" แต่ละดอก (1 แท็ก = 1 กุญแจ/ห้อง)
+├─ id, room_name, tag_uid (unique), description, is_active, created_at
+├─ status ('available' | 'borrowed')
+├─ borrowed_by_teacher_id (FK -> teachers, nullable)
+├─ borrowed_at (nullable)
+
+key_logs                      -- ประวัติยืม-คืนทั้งหมด
+├─ id, room_tag_id (FK -> room_tags), teacher_id (FK -> teachers)
+├─ action ('borrow' | 'return')
+├─ acted_at
+```
+
+ระบบนี้**ไม่มี**นักเรียน, ไม่มี `room_items`, ไม่มีขั้นตอน pending/approve,
+และไม่มีการมอบหมายครูดูแลห้องเฉพาะ (ครูคนไหนมีแท็กก็ยืมกุญแจดอกไหนก็ได้)
+
+---
+
+## 4. Auth
+
+ใช้ JWT แบบ stateless (ไม่มี session store ฝั่ง server) — token เก็บ
+`{ role, id, name }`
+
+| Role | id ใน token | วิธี login |
+|---|---|---|
+| `teacher` | `teachers.id` จริงจาก DB | รหัสครู (ตัวเลข 6-12 หลัก) |
+| `admin` | `null` | เทียบกับ `ADMIN_USERNAME` / `ADMIN_PASSWORD` ใน env เท่านั้น ไม่มีแถวใน DB |
+
+**การใช้ middleware ในไฟล์ route:**
+```js
+const { requireAuth, requireRole } = require("./middleware_auth");
+
+router.get("/x", requireAuth, handler);
+router.post("/y", requireAuth, requireRole("teacher"), handler);
+router.delete("/z", requireAuth, requireRole("admin"), handler);
+```
+
+`POST /api/tap` เป็นข้อยกเว้น — **ไม่ผ่าน requireAuth** เพราะเครื่องอ่านที่
+ห้องทะเบียนเป็นจุดที่ต้องเชื่อถือได้ทางกายภาพอยู่แล้ว (ต้องมีบัตรแท็กจริง
+ถึงจะแตะได้) ไม่ใช่ "ผู้ใช้ที่ login" ผ่านหน้าเว็บ
+
+---
+
+## 5. API Routes
+
+```
+POST   /api/register/teacher          สมัครครู
+POST   /api/login/teacher             ล็อกอินครู (ด้วยรหัสครู)
+POST   /api/login/admin               ล็อกอินแอดมิน
+GET    /api/me                        ข้อมูลผู้ใช้ปัจจุบัน (requireAuth)
+
+POST   /api/tap                       รับการแตะแท็กจากเครื่องอ่าน (public)
+GET    /api/tap/session               poll เช็คสถานะ session ปัจจุบัน
+POST   /api/tap/session/clear         ปิด session ทันที
+
+GET    /api/keys/status               สถานะกุญแจทั้งหมด (requireAuth)
+GET    /api/keys/history/mine         ประวัติยืม-คืนของครูตัวเอง (requireAuth, teacher)
+
+GET    /api/admin/rooms               รายการห้อง/กุญแจ (admin)
+POST   /api/admin/rooms               สร้างห้อง/กุญแจใหม่ (admin)
+PATCH  /api/admin/rooms/:id           แก้ไขห้อง/กุญแจ (admin)
+DELETE /api/admin/rooms/:id           ลบห้อง/กุญแจ (admin)
+
+GET    /api/admin/teacher-tags        รายการครู + สถานะแท็ก (admin)
+POST   /api/admin/teacher-tags        ผูกแท็กให้ครู (admin)
+PATCH  /api/admin/teacher-tags/:id    เปลี่ยนแท็กครู (admin)
+DELETE /api/admin/teacher-tags/:id    ถอดแท็กครู (admin)
+
+GET    /api/admin/keys/status         สถานะกุญแจทั้งหมด แบบละเอียด (admin)
+GET    /api/admin/keys/history        ประวัติยืม-คืนทั้งหมด, filter ได้ (admin)
+```
+
+ทุก `/api/admin/*` ถูกป้องกันด้วย `requireAuth + requireRole("admin")`
+ที่จุด mount ใน `server.js` เพียงจุดเดียว ไม่ต้องใส่ middleware ซ้ำในแต่ละไฟล์ route
+
+---
+
+## 6. การตั้งค่าและรันในเครื่อง (Local Development)
+
+### 6.1 ติดตั้ง dependencies
+```bash
+cd webapp
+npm install
+```
+
+### 6.2 ตั้งค่า Environment Variables
+คัดลอก `.env.example` เป็น `.env` แล้วกรอกค่าจริง:
+
+```env
+SUPABASE_URL=https://xxxxxxxxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+JWT_SECRET=สุ่มยาวๆ-เปลี่ยนก่อนใช้งานจริง
+JWT_EXPIRES_IN=7d
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your-password-here
+```
+
+> ⚠️ **`SUPABASE_SERVICE_ROLE_KEY`** เป็นคีย์สิทธิ์เต็ม (bypass RLS ทั้งหมด)
+> ห้าม commit ขึ้น git หรือหลุดไปฝั่ง frontend เด็ดขาด — หาได้จาก
+> Supabase Dashboard → Settings → API → **service_role** (ไม่ใช่ `anon public`)
+
+### 6.3 รันเซิร์ฟเวอร์
+```bash
+npm start
+```
+เปิดที่ `http://localhost:3000`
+
+---
+
+## 7. Deploy ขึ้น Render
+
+### 7.1 เตรียม repo
+- Push โค้ดขึ้น GitHub (branch `main`)
+- **ห้าม** commit ไฟล์ `.env` จริง — เก็บแค่ `.env.example` ที่เป็น placeholder เท่านั้น
+
+### 7.2 สร้าง Web Service บน Render
+1. เข้า [render.com](https://render.com) → Sign in ด้วย GitHub
+2. **New +** → **Web Service** → เลือก repo นี้
+3. ตั้งค่า Build:
+
+| ช่อง | ค่า |
 |---|---|
-| R80CP | อ่านเลขบัตร ส่งเป็นข้อความเข้า input ที่โฟกัสอยู่บนเบราว์เซอร์ ทันทีที่แตะบัตร |
-| โน้ตบุ๊ค | รันหน้าเว็บที่มี input ซ่อน/โฟกัสค้างไว้เพื่อรับค่าจากเครื่องอ่าน + รัน XAMPP |
-| XAMPP | Apache รัน PHP ประมวลผล logic ยืม-คืน, MySQL เก็บข้อมูล |
-| ngrok | เปิด tunnel ให้เข้าถึงแดชบอร์อดจากอินเทอร์เน็ตภายนอกได้ (ดูรายงาน/สถานะ) |
+| Branch | `main` |
+| Root Directory | `webapp` |
+| Runtime | `Node` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
 
----
-
-## 3. เรื่องเครื่องอ่านบัตร — ต้องมีสคริปต์ Python แยกไหม?
-
-**ไม่จำเป็นต้องมี** เพราะ R80CP เป็น HID Keyboard Emulation อยู่แล้ว:
-- เสียบ USB ปุ๊บ พร้อมใช้ทันที ไม่ต้องลงไดรเวอร์ ไม่ต้องมี background service
-- สิ่งที่ต้องมีคือ **หน้าเว็บที่มี `<input>` โฟกัสค้างอยู่ตลอดเวลา** (เช่นใช้ JavaScript คอย auto-focus กลับเข้า input ทุกครั้งที่เผลอเสียโฟกัส) เมื่อแตะบัตร ตัวเลขจะถูกพิมพ์เข้า input นั้นเหมือนคนพิมพ์คีย์บอร์ด แล้วกด Enter (ตั้งค่าได้ว่าจะให้มี Enter ต่อท้ายหรือไม่)
-- ฝั่ง JS ดักจับ event `keydown`/`input` ของ input นั้น พอเจอ Enter หรือความยาวครบตามรูปแบบที่ตั้งไว้ ก็ยิง AJAX ไปที่ PHP backend เพื่อบันทึกข้อมูล
-
-**เมื่อไหร่ถึงจะต้องใช้สคริปต์ Python แยก?**
-- ถ้าต้องการให้ระบบทำงานได้แม้ไม่มีเบราว์เซอร์เปิดอยู่ หรือไม่มี input โฟกัสอยู่ตลอดเวลา (เช่นรันเป็น background service)
-- ถ้าต้องการเชื่อมกับอุปกรณ์อื่นเพิ่มเติมที่ไม่ใช่ HID (เช่นเครื่องอ่านรุ่นที่ใช้ Serial/API)
-- ถ้าต้องการ validate/กรองรูปแบบเลขบัตรก่อนส่งเข้าเว็บ (แต่ส่วนนี้ทำใน JS/PHP ก็ได้เช่นกัน)
-
-**สรุป:** สำหรับ scope ปัจจุบัน ใช้แค่หน้าเว็บ + JS คอยดัก input ก็เพียงพอ ไม่ต้องเขียน Python เพิ่ม
-
----
-
-## 4. XAMPP ใช้ทำอะไรในระบบนี้
-
-XAMPP คือชุดโปรแกรมที่รวม Apache (web server) + MySQL (database) + PHP ไว้ในเครื่องเดียว ใช้เป็น **backend ทั้งหมดของระบบ**:
-- **Apache + PHP**: รับค่าจากหน้าเว็บ (เลขบัตรที่แตะ), ประมวลผล logic ว่าเป็นการยืมหรือคืน, render หน้าแดชบอร์ด
-- **MySQL**: เก็บข้อมูล
-  - ตารางแท็ก (ครู, ห้อง/กุญแจ) พร้อมชื่อ-รายละเอียดที่ผูกกับเลขบัตร
-  - ตารางรายการยืม-คืน (transaction log)
-  - สถานะปัจจุบันของแต่ละอุปกรณ์ (ว่าง /ถูกยืมอยู่ / โดยใคร)
-
----
-
-## 5. ngrok ใช้ทำอะไร
-
-ngrok เปิด tunnel จาก XAMPP (Apache พอร์ต 80) ออกสู่อินเทอร์เน็ต ทำให้:
-- ดูแดชบอร์ดสถานะการยืม-คืนได้จากมือถือ/คอมเครื่องอื่น โดยไม่ต้องอยู่ในวง LAN เดียวกับโน้ตบุ๊ค
-- **ข้อควรรู้:** ngrok ไม่ได้ทำให้ "แตะบัตรจากระยะไกล" ได้ เพราะ R80CP ต้องเสียบอยู่กับโน้ตบุ๊คเครื่องจริงที่หน้างานเท่านั้น ngrok ใช้สำหรับ "ดูข้อมูล" ไม่ใช่ "ยิงข้อมูลเข้าระบบจากนอกสถานที่"
-- ควรตั้งรหัสผ่าน/Basic Auth ให้กับลิงก์ ngrok เพราะ default จะเปิดสาธารณะให้ใครก็เข้าดูได้ถ้ารู้ลิงก์
-
----
-
-## 6. โครงสร้างข้อมูลเบื้องต้น (Database Schema แบบร่าง)
+### 7.3 ตั้งค่า Environment Variables บน Render
+ไปที่ **Environment** แล้วเพิ่มตัวแปรเดียวกับข้อ 6.2 (ค่าจริง ไม่ใช่ placeholder):
 
 ```
-tags               -- ข้อมูลแท็กทั้งหมด (ครู, ห้อง, กุญแจ)
-├─ id
-├─ card_uid         (เลขที่อ่านได้จากบัตร)
-├─ type             ('teacher' หรือ 'item')
-├─ name             (ชื่อครู หรือชื่อห้อง/กุญแจ)
-└─ status           (active/inactive)
-
-transactions        -- รายการยืม-คืน
-├─ id
-├─ teacher_tag_id    (FK -> tags.id)
-├─ item_tag_id       (FK -> tags.id)
-├─ action            ('borrow' หรือ 'return')
-├─ timestamp
-└─ session_ref       (ใช้จับคู่การแตะ 2 ครั้งของรอบเดียวกัน)
-
-item_status          -- สถานะปัจจุบันของแต่ละห้อง/กุญแจ
-├─ item_tag_id
-├─ current_status     (available / borrowed)
-├─ borrowed_by         (FK -> tags.id ครูที่ถืออยู่)
-└─ borrowed_at
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+JWT_SECRET
+JWT_EXPIRES_IN
+ADMIN_USERNAME
+ADMIN_PASSWORD
 ```
 
-**Logic การจับคู่ 2 แตะ:**
-1. แตะครั้งแรก → เช็คว่าเป็นแท็กประเภท `teacher` → เก็บไว้ใน session ชั่วคราว (เช่น session_id ฝั่ง PHP หรือ state ใน JS) พร้อมตั้ง timeout (เช่น 10-15 วินาที ถ้าไม่แตะครั้งที่สองให้ยกเลิก)
-2. แตะครั้งที่สอง → เช็คว่าเป็นแท็กประเภท `item` → ดูสถานะปัจจุบันของ item นั้นใน `item_status`
-   - ถ้า `available` → บันทึกเป็น `borrow`, อัปเดตสถานะเป็น `borrowed`
-   - ถ้า `borrowed` และผู้ยืมเดิมคือครูคนเดียวกัน → บันทึกเป็น `return`, อัปเดตสถานะเป็น `available`
-   - ถ้า `borrowed` โดยครูคนอื่น → แจ้งเตือนหน้าเว็บว่า "อุปกรณ์นี้ถูกยืมอยู่โดย [ชื่อครู]"
+> ไม่ต้องตั้ง `PORT` — Render กำหนดให้อัตโนมัติ และ `server.js`
+> อ่านจาก `process.env.PORT || 3000` อยู่แล้ว
 
----
-
-## 7. สิ่งที่ยังต้องตัดสินใจเพิ่มเติม
-
-- [ ] ต้องการให้ครูแตะแท็กครั้งแรกทุกครั้ง หรือให้เลือก dropdown ชื่อครูแทนได้ไหม (กรณีลืมแท็ก)
-- [ ] ต้องการแจ้งเตือน (เสียง/ไลน์/อีเมล) เมื่อยืมเกินเวลาที่กำหนดหรือไม่
-- [ ] ต้องการ login สำหรับหน้าแดชบอร์ดหรือเปิดดูได้เลย
-- [ ] ระยะยาวจะย้ายจาก ngrok ไป deploy ขึ้น hosting/VPS จริงหรือไม่ (แนะนำสำหรับใช้งานจริงจัง เพราะ ngrok free มีข้อจำกัดเรื่อง uptime/ลิงก์เปลี่ยน)
+### 7.4 Deploy
+กด **Create Web Service** — Render จะ build และ deploy อัตโนมัติทุกครั้งที่ push ขึ้น `main`
 
 ---
 
 ## 8. ข้อควรระวังด้านความปลอดภัย
 
-- ตั้ง Basic Auth หรือ token ป้องกันการเข้าถึงแดชบอร์ดผ่าน ngrok โดยไม่ได้รับอนุญาต
-- MySQL ควรตั้งรหัสผ่าน (ค่า default XAMPP มักไม่มีรหัส root)
-- สำรองข้อมูล (backup) ฐานข้อมูลเป็นระยะ เผื่อเครื่องโน้ตบุ๊คมีปัญหา
+- `SUPABASE_SERVICE_ROLE_KEY` และ `JWT_SECRET` ต้องอยู่ใน environment variables เท่านั้น ห้ามฝังในโค้ดหรือ commit ขึ้น git
+- `.env.example` ต้องมีแต่ค่า placeholder (เช่น `your-key-here`) ไม่ใช่ค่าที่หน้าตาเหมือนคีย์จริง เพราะ GitHub secret scanning จะบล็อกการ push ถ้าตรวจพบ pattern คล้ายคีย์จริง
+- ตั้ง `JWT_SECRET` เป็นค่าที่ตั้งเองแบบสุ่มยาวๆ เสมอในสภาพแวดล้อม production — ไม่พึ่งค่า fallback ที่ตั้งไว้ในโค้ด
+- `POST /api/tap` เปิดสาธารณะโดยตั้งใจ (ไม่มี JWT) — ความปลอดภัยของ endpoint นี้ขึ้นกับการควบคุมทางกายภาพว่าใครเข้าถึงเครื่องอ่านที่ห้องทะเบียนได้บ้าง
 
+---
 
+## 9. สิ่งที่ยังต้องตัดสินใจเพิ่มเติม
 
-
-สถาปัตยกรรมใหม่ (Express + Supabase, สเกลลง)
-แนวคิดหลัก
-ตัดนักเรียนออกทั้งหมด, ตัด "ของ" (room_items) ออก — เหลือแค่ ครู กับ กุญแจ
-ตัด flow pending/approve ออกทั้งหมด — แตะแท็ก = จบทันที (ไม่มี transaction รออนุมัติ)
-ตัด teacher_room_assignments (มอบหมายครูดูแลห้อง) ออก — ครูคนไหนมีแท็กก็ยืมห้องไหนก็ได้
-เพิ่ม endpoint สาธารณะสำหรับเครื่องแตะแท็ก (ไม่ผ่าน JWT เพราะเครื่องอ่านที่ห้องทะเบียนไม่ได้ login เป็นใครคนหนึ่ง — ตัวเครื่องเองก็คือจุดที่ต้องเชื่อถือได้อยู่แล้ว)
-DB Schema ใหม่
-teachers                      -- คงไว้ (ระบบสมัคร/ล็อกอินปกติ)
-├─ id, name, department, teacher_code, created_at, last_login_at
-
-teacher_tags                  -- คงไว้ (1:1 ครู <-> แท็กประจำตัว)
-├─ id, teacher_id (unique), tag_uid (unique), assigned_at
-
-room_tags                     -- คงไว้แต่ตัด "ห้อง" concept ออก ให้เป็น "กุญแจ" ตรงๆ
-├─ id, room_name, tag_uid (unique), description, is_active, created_at
-   -- เพิ่มสถานะปัจจุบันเข้ามาตรงนี้เลย (ไม่ต้องมี room_items อีกชั้น):
-├─ status ('available' | 'borrowed')
-├─ borrowed_by_teacher_id (FK -> teachers, nullable)
-├─ borrowed_at (nullable)
-
-key_logs                      -- ประวัติยืม-คืนทั้งหมด (แทน transactions เดิม)
-├─ id, room_tag_id (FK), teacher_id (FK)
-├─ action ('borrow' | 'return')
-├─ acted_at
-
--- ตัดออกทั้งหมด: students, room_items, teacher_room_assignments,
---                 transactions (แบบ pending/approve), access_violation_logs
-
-Logic การแตะ 2 ครั้ง (จุดหัวใจ):
-
-แตะแท็กครู → server หาว่า tag_uid นี้ผูกกับครูคนไหนใน teacher_tags → เก็บ "session ชั่วคราว" (in-memory ฝั่ง server พอ ไม่ต้องมี DB table เพราะเป็น session สั้นๆ ไม่กี่วินาที ใช้ Map<sessionId, {teacherId, timestamp}> + timeout ก็พอ)
-แตะแท็กกุญแจ (ได้หลายดอกต่อเนื่องในหนึ่ง session ครู) → หา room_tags จาก tag_uid → เช็ค status:
-available → update เป็น borrowed + insert key_logs action=borrow
-borrowed โดยครูคนเดียวกับ session → update เป็น available + insert key_logs action=return
-borrowed โดยครูอื่น → ตอบ error "ถูกยืมโดยครูท่านอื่นอยู่" ไม่ทำอะไร
-Route ใหม่
-POST /api/register/teacher     (คงเดิม)
-POST /api/login/teacher        (คงเดิม)
-POST /api/login/admin          (คงเดิม)
-GET  /api/me                   (คงเดิม)
-
-POST /api/tap                  (ใหม่ — endpoint เดียวรับทุกการแตะจากเครื่องอ่าน)
-                                body: { tagUid }
-                                ไม่ต้อง requireAuth (เครื่องอ่านที่ห้องทะเบียนเป็น
-                                จุดเชื่อถือได้ทางกายภาพอยู่แล้ว)
-                                ตอบกลับ state ปัจจุบันของ session (รอแตะกุญแจ /
-                                ยืมสำเร็จ / คืนสำเร็จ / error) ให้หน้าจอแสดงผล
-
-/api/admin/rooms/*              (คงเดิม แต่ตัด tagUid dependency ของ room_items)
-/api/admin/teacher-tags/*       (คงเดิมทั้งหมด)
-GET /api/admin/keys/status      (ใหม่ — กุญแจทั้งหมด + สถานะ + ใครยืมอยู่)
-GET /api/admin/keys/history     (ใหม่ — key_logs ทั้งหมด, filter ได้)
-ไฟล์ที่ต้องลบ
-ไฟล์	เหตุผล
-routes/transactions.js	flow pending/approve ทั้งไฟล์ไม่ใช้แล้ว แทนที่ด้วย routes/tap.js ใหม่
-routes/admin_items.js	room_items ไม่มีแล้ว (กุญแจ = room_tags ตรงๆ)
-routes/admin_assignments.js	ตัดมอบหมายครูดูแลห้องออกตามที่ยืนยัน
-ไฟล์ที่ต้องแก้
-ไฟล์	แก้อะไร
-schema.sql	ลบ students, room_items, teacher_room_assignments, transactions, access_violation_logs, trigger 6 ห้อง — เพิ่ม status/borrowed_by_teacher_id/borrowed_at ใน room_tags, เพิ่มตาราง key_logs
-server.js	ลบ mount transactionRoutes, adminItemsRoutes, adminAssignmentsRoutes — เพิ่ม mount tapRoutes (public, ไม่ผ่าน requireAuth)
-routes/auth.js	ลบ endpoint /register/student, /login/student ทั้งหมด
-routes/admin_rooms.js	แก้ POST/PATCH ให้ไม่ยุ่งกับ tagUid ซ้ำซ้อน (อันนี้จริงๆ ใกล้เคียงเดิมมาก อาจแทบไม่ต้องแก้) + เพิ่ม field status ตอน list
-middleware/auth.js	ไม่ต้องแก้ (requireAuth/requireRole ยังใช้ได้เหมือนเดิมกับครู/แอดมิน)
-routes/admin_teachers.js	ไม่ต้องแก้ (teacher_tags ยังเหมือนเดิมทุกอย่าง)
-ไฟล์ใหม่ที่ต้องสร้าง
-ไฟล์	หน้าที่
-routes/tap.js	endpoint /api/tap รับ tagUid จากเครื่องอ่าน, จัดการ session แตะครู→แตะกุญแจ
-routes/admin_keys.js	/api/admin/keys/status, /api/admin/keys/history
+- [ ] ต้องการแจ้งเตือน (เสียง/ไลน์/อีเมล) เมื่อยืมเกินเวลาที่กำหนดหรือไม่
+- [ ] ต้องการให้ปรับ `SESSION_TTL_MS` (ปัจจุบัน 20 วินาที ใน `routes/tap.js`) ให้นานขึ้นหรือไม่
+- [ ] รองรับเครื่องอ่านหลายเครื่องพร้อมกัน (มี `readerId` รองรับไว้แล้วในโค้ด แต่ยังไม่ได้ใช้งานจริงหลายเครื่อง)
