@@ -26,7 +26,7 @@ router.get("/keys/status", async (req, res) => {
     const { data, error } = await supabase
       .from("room_tags")
       .select(
-        "id, room_name, tag_uid, description, is_active, status, borrowed_at, borrowed_by:borrowed_by_teacher_id(id, name, department)"
+        "id, room_name, tag_uid, description, is_active, status, borrowed_at, image_url, borrowed_by:borrowed_by_teacher_id(id, name, department)"
       )
       .eq("is_active", true)
       .order("room_name", { ascending: true });
