@@ -1,6 +1,10 @@
 // routes/admin_teachers.js
 // -----------------------------------------------------------------
-// เฉพาะส่วน "assign เลขแท็กให้ครู" (teacher_tags, 1:1 กับ teachers)
+// สองส่วนที่เกี่ยวกับ "ครู" ฝั่งแอดมิน:
+//   1. แก้ไขข้อมูลตัวครูเอง (PATCH /teachers/:id — ชื่อ/แผนก)
+//   2. assign เลขแท็กให้ครู (teacher_tags, 1:1 กับ teachers)
+// รวมสองส่วนไว้ไฟล์เดียวเพราะทั้งคู่ผูกกับหน้า "แท็กครู" เดียวกันใน
+// admin dashboard และมีขนาดเล็กพอที่ไม่ต้องแยกไฟล์ (ดู MANIFEST Task 3)
 // -----------------------------------------------------------------
 
 const express = require("express");
@@ -101,6 +105,62 @@ router.post("/teacher-tags", async (req, res) => {
     return res.status(500).json({
       ok: false,
       message: "ผูกแท็กให้ครูไม่สำเร็จ",
+    });
+  }
+});
+
+// -------------------------------------------------------------
+// PATCH /api/admin/teachers/:id
+// body: { name, department }
+// แก้ไขข้อมูลตัวครูเอง (ชื่อ-นามสกุล / แผนก) — แยกจาก PATCH
+// /teacher-tags/:teacherId ด้านล่าง ซึ่งแก้แค่เลขแท็ก RFID เท่านั้น
+// สองอันนี้ตั้งใจแยก endpoint กันเพราะเป็นคนละ resource กัน (teachers
+// vs teacher_tags) แม้จะแก้ไขจากหน้าแอดมินเดียวกันก็ตาม
+//
+// กติกา:
+//   - name: บังคับกรอก ห้ามเป็นค่าว่าง/เว้นวรรคล้วน (เหมือนตอนสมัคร)
+//   - department: ไม่บังคับ — ส่ง null หรือสตริงว่างเพื่อเคลียร์ค่าเดิม
+//     ได้ ไม่ส่งมาเลย (undefined) = ไม่แตะฟิลด์นี้
+//   - ไม่แตะ teacher_code หรือ teacher_tags จาก endpoint นี้เลย
+// -------------------------------------------------------------
+router.patch("/teachers/:id", async (req, res) => {
+  const { id } = req.params;
+  const { name, department } = req.body;
+
+  if (name !== undefined && (!name || !name.trim())) {
+    return res.status(400).json({ ok: false, message: "กรุณากรอกชื่อ-นามสกุล" });
+  }
+
+  const updatePayload = {};
+  if (name !== undefined) updatePayload.name = name.trim();
+  if (department !== undefined) {
+    updatePayload.department = department && department.trim() ? department.trim() : null;
+  }
+
+  if (Object.keys(updatePayload).length === 0) {
+    return res.status(400).json({ ok: false, message: "ไม่มีข้อมูลให้แก้ไข" });
+  }
+
+  try {
+    const { data: updated, error: updateError } = await supabase
+      .from("teachers")
+      .update(updatePayload)
+      .eq("id", id)
+      .select()
+      .maybeSingle();
+
+    if (updateError) throw updateError;
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, message: "ไม่พบครูคนนี้" });
+    }
+
+    return res.json({ ok: true, teacher: updated });
+  } catch (err) {
+    console.error("Admin update teacher error:", err.message);
+    return res.status(500).json({
+      ok: false,
+      message: "แก้ไขข้อมูลครูไม่สำเร็จ",
     });
   }
 });
