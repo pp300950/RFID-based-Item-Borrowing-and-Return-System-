@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>หน้าครู — ระบบยืม-คืนกุญแจ RFID</title>
+<title>สถานะกุญแจ — ระบบยืม-คืนกุญแจ RFID</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css" />
@@ -15,17 +15,11 @@
 
     <header class="teacher-topbar">
       <div>
-        <div class="teacher-brand-eyebrow">ACCESS PASS · TEACHER</div>
-        <h1 class="teacher-brand-title">สถานะกุญแจ &amp; ประวัติของฉัน</h1>
+        <div class="teacher-brand-eyebrow">ACCESS PASS · สถานะกุญแจ</div>
+        <h1 class="teacher-brand-title">สถานะกุญแจทั้งหมด</h1>
       </div>
 
-      <div class="teacher-user-block">
-        <div class="teacher-user-name">
-          <strong id="user-name">—</strong>
-          <span id="user-meta"></span>
-        </div>
-        <button id="logout-btn" class="logout-btn">ออกจากระบบ</button>
-      </div>
+      <a href="/" class="logout-btn">&larr; กลับหน้าแรก</a>
     </header>
 
     <main class="teacher-main">
@@ -33,8 +27,9 @@
       <section>
         <h2 class="teacher-section-title">วิธีใช้งาน</h2>
         <p class="teacher-section-sub">
-          แตะแท็กประจำตัวครูที่เครื่องอ่านหน้าห้องทะเบียนก่อน แล้วแตะแท็กกุญแจที่ต้องการยืมหรือคืน
-          ระบบจะบันทึกให้ทันที หน้านี้ใช้แค่ดูสถานะและประวัติเท่านั้น ไม่ใช้ยืม-คืนผ่านเว็บ
+          ครูแตะบัตรประจำตัวที่เครื่องอ่านหน้าห้องทะเบียนก่อน แล้วแตะแท็กกุญแจที่ต้องการยืมหรือคืน
+          ระบบจะบันทึกให้ทันที หน้านี้เป็นหน้าสาธารณะสำหรับดูสถานะปัจจุบันเท่านั้น ไม่ใช้ยืม-คืนผ่านเว็บ
+          และไม่ต้องเข้าสู่ระบบ
         </p>
       </section>
 
@@ -57,27 +52,6 @@
 
         <div id="items-grid" class="items-grid">
           <div class="empty-state">กำลังโหลด...</div>
-        </div>
-      </section>
-
-      <!-- ============== ประวัติการยืม-คืนของฉัน ============== -->
-      <section>
-        <h2 class="teacher-section-title">ประวัติการยืม-คืนของฉัน</h2>
-        <p class="teacher-section-sub">รายการล่าสุดของคุณ 50 รายการ</p>
-
-        <div class="table-wrap">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>ห้อง/กุญแจ</th>
-                <th>การกระทำ</th>
-                <th>เวลา</th>
-              </tr>
-            </thead>
-            <tbody id="history-tbody">
-              <tr class="row-empty"><td colspan="3">กำลังโหลด...</td></tr>
-            </tbody>
-          </table>
         </div>
       </section>
 

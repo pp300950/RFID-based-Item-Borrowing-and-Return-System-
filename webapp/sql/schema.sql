@@ -131,3 +131,36 @@ alter table key_logs disable row level security;
 --     acted_at timestamptz not null default now()
 --   );
 -- -----------------------------------------------------------------
+
+
+
+
+-- =================================================================
+-- Migration: เพิ่มรูปภาพห้อง/กุญแจ
+-- รันใน Supabase SQL editor ครั้งเดียว
+-- =================================================================
+
+-- 1) เพิ่มคอลัมน์เก็บ public URL ของรูปห้อง
+alter table room_tags
+  add column if not exists image_url text;
+
+-- 2) สร้าง Storage bucket สำหรับเก็บไฟล์รูปห้อง (public bucket เพราะต้อง
+--    แสดงรูปให้ครูดูได้โดยไม่ต้อง sign URL)
+insert into storage.buckets (id, name, public)
+values ('room-images', 'room-images', true)
+on conflict (id) do nothing;
+
+-- 3) Storage policy: อนุญาตให้ทุกคนอ่านรูปได้ (bucket เป็น public อยู่แล้ว
+--    แต่ policy นี้จำเป็นสำหรับ RLS ของ storage.objects)
+--    หมายเหตุ: Postgres ไม่รองรับ "create policy if not exists" (ต่างจาก
+--    create table/index) จึง drop เดิมทิ้งก่อนเสมอแล้วค่อยสร้างใหม่
+--    เพื่อให้สคริปต์นี้รันซ้ำได้โดยไม่ error
+drop policy if exists "Public read room images" on storage.objects;
+
+create policy "Public read room images"
+  on storage.objects for select
+  using (bucket_id = 'room-images');
+
+-- หมายเหตุ: การ insert/update/delete รูปทำผ่าน service_role key ฝั่ง
+-- backend (supabaseClient.js) เท่านั้น ซึ่ง bypass RLS อยู่แล้ว จึงไม่ต้อง
+-- เพิ่ม policy insert/update/delete ให้ client ฝั่ง browser โดยตรง

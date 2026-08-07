@@ -25,6 +25,10 @@
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabaseClient");
+const {
+  getPendingRegistration,
+  resolveRegistration,
+} = require("./register_session");
 
 const SESSION_TTL_MS = 20 * 1000; // 20 วินาที นับจากการแตะล่าสุด (ครูหรือกุญแจ)
 
@@ -94,9 +98,29 @@ router.post("/tap", async (req, res) => {
 
     if (teacherTagError) throw teacherTagError;
 
-    // --- กรณี 1: แตะแท็กครู -> เปิด session ใหม่ (ทับ session เดิมถ้ามี) ---
+    // --- กรณี 1: แตะแท็กครู ---
     if (teacherTag) {
       const teacher = teacherTag.teachers;
+
+      // ถ้า readerId นี้กำลังอยู่ในโหมดรอสมัครครูคนใหม่พอดี แปลว่าคนที่
+      // กำลังสมัครแตะบัตรใบที่ "มีคนใช้อยู่แล้ว" เข้ามา (บัตรประจำตัว
+      // ครูที่โรงเรียนออกให้ ไม่ใช่แท็กแบนพวงกุญแจแบบเดิม ผูกได้แค่ครู
+      // เดียวเสมอ) ต้องแจ้ง error ให้ชัดว่าบัตรนี้ผูกกับครูคนอื่นไปแล้ว
+      // ไม่ใช่ไปเปิด session ยืม-คืนแทนให้เงียบๆ
+      const pendingDuringTeacherTap = getPendingRegistration(reader);
+      if (pendingDuringTeacherTap) {
+        resolveRegistration(reader, {
+          ok: false,
+          message: `บัตรใบนี้ถูกใช้เป็นบัตรประจำตัวของคุณครู ${teacher.name} อยู่แล้ว กรุณาใช้บัตรใบอื่น หรือติดต่อแอดมินหากบัตรนี้ควรเป็นของคุณ`,
+        });
+        return res.status(409).json({
+          ok: false,
+          state: "tag_already_bound",
+          message: `บัตรใบนี้ถูกใช้เป็นบัตรประจำตัวของคุณครู ${teacher.name} อยู่แล้ว`,
+        });
+      }
+
+      // ไม่ได้อยู่ในโหมดสมัคร -> เป็นการแตะปกติ เปิด session ยืม-คืน (ทับ session เดิมถ้ามี)
       setSession(reader, teacher.id, teacher.name);
 
       return res.json({
@@ -117,11 +141,72 @@ router.post("/tap", async (req, res) => {
     if (roomTagError) throw roomTagError;
 
     if (!roomTag) {
-      return res.status(404).json({
-        ok: false,
-        state: "unknown_tag",
-        message: "ไม่พบแท็กนี้ในระบบ (ไม่ใช่ทั้งแท็กครูและแท็กกุญแจ)",
-      });
+      // -------------------------------------------------------
+      // ไม่เจอทั้ง teacher_tags และ room_tags — ก่อนจะตอบว่า "ไม่รู้จัก
+      // แท็กนี้" ต้องเช็คก่อนว่า readerId นี้กำลังอยู่ใน "โหมดรอสมัคร"
+      // ครูอยู่หรือเปล่า (มีคนกรอกฟอร์มสมัครค้างไว้ผ่าน
+      // POST /api/register/teacher/start แล้วรอแตะบัตรอยู่พอดี)
+      //
+      // ถ้าใช่ -> intent ตอนนั้นชัดเจนว่าแตะเพื่อผูกเป็นบัตรครูใหม่
+      // จึงสร้างครูใหม่ + ผูก tag_uid ให้ทันที ไม่ต้อง auto-create
+      // ในกรณีอื่นนอกเหนือจากนี้เด็ดขาด (ความปลอดภัย: ป้องกันแท็กแปลก
+      // ปลอมสร้างครูใหม่มั่วๆ ตอนไม่มีใครกำลังสมัครอยู่)
+      // -------------------------------------------------------
+      const pending = getPendingRegistration(reader);
+
+      if (!pending) {
+        return res.status(404).json({
+          ok: false,
+          state: "unknown_tag",
+          message: "ไม่พบแท็กนี้ในระบบ (ไม่ใช่ทั้งแท็กครูและแท็กกุญแจ)",
+        });
+      }
+
+      try {
+        const { data: createdTeacher, error: createTeacherError } = await supabase
+          .from("teachers")
+          .insert({
+            name: pending.name,
+            department: pending.department,
+            last_login_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (createTeacherError) throw createTeacherError;
+
+        const { error: createTagError } = await supabase
+          .from("teacher_tags")
+          .insert({
+            teacher_id: createdTeacher.id,
+            tag_uid: cleanTagUid,
+          });
+
+        if (createTagError) throw createTagError;
+
+        resolveRegistration(reader, {
+          ok: true,
+          teacher: { id: createdTeacher.id, name: createdTeacher.name },
+        });
+
+        return res.json({
+          ok: true,
+          state: "registered",
+          message: `สมัครสำเร็จ — คุณครู ${createdTeacher.name} ผูกบัตรประจำตัวเรียบร้อยแล้ว`,
+          teacher: { id: createdTeacher.id, name: createdTeacher.name },
+        });
+      } catch (registerErr) {
+        console.error("Tap register-bind error:", registerErr.message);
+        resolveRegistration(reader, {
+          ok: false,
+          message: "ผูกบัตรกับบัญชีที่กำลังสมัครไม่สำเร็จ กรุณาลองสมัครใหม่อีกครั้ง",
+        });
+        return res.status(500).json({
+          ok: false,
+          state: "register_failed",
+          message: "ผูกบัตรกับบัญชีที่กำลังสมัครไม่สำเร็จ กรุณาลองสมัครใหม่อีกครั้ง",
+        });
+      }
     }
 
     // --- กรณี 2: แตะแท็กกุญแจ -> ต้องมี session ครูที่ยัง active อยู่ก่อน ---

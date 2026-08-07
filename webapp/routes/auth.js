@@ -3,143 +3,83 @@
 // เหลือแค่ ครู + แอดมิน (ตัดนักเรียนออกทั้งหมดตามสถาปัตยกรรมใหม่ —
 // ระบบนี้ไม่มีนักเรียนเข้าใช้งานเว็บแล้ว มีแค่ครูที่ยืม-คืนกุญแจผ่าน
 // การแตะแท็กจริงที่เครื่องอ่าน ไม่ใช่ผ่านฟอร์มเว็บ)
+//
+// *** เปลี่ยนใหญ่: ตัด teacher login/register แบบกรอกรหัสครูเองออก
+// ทั้งหมด *** ครูไม่ login ผ่านเว็บอีกต่อไป — การสมัครเปลี่ยนเป็น
+// "กรอกชื่อ-แผนก แล้วไปแตะบัตรประจำตัวที่เครื่องอ่านที่ห้องทะเบียน"
+// โดย tag_uid จะถูกผูกให้อัตโนมัติทันทีที่แตะ (ดู routes/tap.js +
+// routes/register_session.js ประกอบ) ไม่มีขั้นตอน "แอดมินผูกแท็ก
+// ทีหลัง" อีกต่อไปสำหรับ flow ปกติ
 // -----------------------------------------------------------------
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabaseClient");
 const { signToken, requireAuth } = require("./middleware_auth");
-
-// รหัสครู: ไม่บังคับ prefix เฉพาะ แต่ต้องเป็นตัวเลข 6-12 หลัก
-const TEACHER_CODE_MIN_LENGTH = 6;
-const TEACHER_CODE_MAX_LENGTH = 12;
-
-function isValidTeacherCode(code) {
-  if (typeof code !== "string") return false;
-  if (code.length < TEACHER_CODE_MIN_LENGTH || code.length > TEACHER_CODE_MAX_LENGTH) return false;
-  if (!/^\d+$/.test(code)) return false; // ต้องเป็นตัวเลขล้วน
-  return true;
-}
+const {
+  startRegistration,
+  pollRegistration,
+  clearRegistration,
+} = require("./register_session");
 
 // =================================================================
-// ครู
+// ครู — สมัครด้วยการแตะบัตร (ไม่มี login ผ่านเว็บอีกต่อไป)
 // =================================================================
 
 // -------------------------------------------------------------
-// POST /api/register/teacher
-// body: { name, department, teacherCode }
+// POST /api/register/teacher/start
+// body: { name, department, readerId? }
+// เปิด "pending registration session" รอให้มีคนไปแตะบัตรที่เครื่องอ่าน
+// ที่ห้องทะเบียน (readerId เดียวกับที่ tap.js ใช้ — ไม่ส่งมาก็ default
+// เป็น "default" เพราะตอนนี้มีเครื่องอ่านเครื่องเดียว)
+//
+// หน้าเว็บต้องเรียก POST นี้ก่อน แล้วค่อยเริ่ม poll
+// GET /api/register/teacher/session ต่อเนื่องจนกว่าจะสำเร็จ/timeout
 // -------------------------------------------------------------
-router.post("/register/teacher", async (req, res) => {
-  const { name, department, teacherCode } = req.body;
+router.post("/register/teacher/start", (req, res) => {
+  const { name, department, readerId } = req.body;
 
-  if (!name || !teacherCode) {
-    return res.status(400).json({ ok: false, message: "กรุณากรอกชื่อและรหัสครูให้ครบ" });
+  if (!name || !name.trim()) {
+    return res.status(400).json({ ok: false, message: "กรุณากรอกชื่อ-นามสกุล" });
   }
 
-  if (!isValidTeacherCode(teacherCode)) {
-    return res.status(400).json({
-      ok: false,
-      message: `รหัสครูไม่ถูกต้อง ต้องเป็นตัวเลข ${TEACHER_CODE_MIN_LENGTH}-${TEACHER_CODE_MAX_LENGTH} หลัก`,
-    });
-  }
+  const reader = startRegistration(readerId, name.trim(), department ? department.trim() : null);
 
-  try {
-    const { data: existing, error: findError } = await supabase
-      .from("teachers")
-      .select("id")
-      .eq("teacher_code", teacherCode)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (existing) {
-      return res.status(409).json({
-        ok: false,
-        message: "รหัสครูนี้เคยสมัครไว้แล้ว กรุณาไปที่แท็บเข้าสู่ระบบแทน",
-      });
-    }
-
-    const { data: created, error: insertError } = await supabase
-      .from("teachers")
-      .insert({
-        name,
-        department: department || null,
-        teacher_code: teacherCode,
-        last_login_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (insertError) throw insertError;
-
-    const token = signToken({ role: "teacher", id: created.id, name: created.name });
-
-    return res.json({ ok: true, teacher: created, token });
-  } catch (err) {
-    console.error("Teacher register error:", err.message);
-    return res.status(500).json({
-      ok: false,
-      message: "เชื่อมต่อฐานข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง หรือเช็คว่าตั้งค่าคีย์ Supabase ถูกต้องหรือยัง",
-    });
-  }
+  return res.json({
+    ok: true,
+    readerId: reader,
+    message: "กรุณาไปแตะบัตรประจำตัวครูที่เครื่องอ่านที่ห้องทะเบียนภายใน 60 วินาที",
+  });
 });
 
 // -------------------------------------------------------------
-// POST /api/login/teacher
-// body: { teacherCode }
+// GET /api/register/teacher/session?readerId=xxx
+// ให้หน้าเว็บ poll เช็คว่ามีคนแตะบัตรเข้ามาจับคู่กับ session สมัครนี้
+// หรือยัง — response 3 แบบ:
+//   { active: true, ... }                     ยังรออยู่ ยังไม่หมดเวลา
+//   { active: false, result: { ok: true, ... } }   แตะสำเร็จ ผูกแท็กแล้ว
+//   { active: false, result: { ok: false, ... } }  แตะแล้วแต่ error (เช่นบัตรซ้ำ)
+//   { active: false }                          หมดเวลา / ไม่มี session
 // -------------------------------------------------------------
-router.post("/login/teacher", async (req, res) => {
-  const { teacherCode } = req.body;
+router.get("/register/teacher/session", (req, res) => {
+  const reader = (req.query.readerId || "default").toString();
+  const status = pollRegistration(reader);
+  return res.json({ ok: true, ...status });
+});
 
-  if (!teacherCode) {
-    return res.status(400).json({ ok: false, message: "กรุณากรอกรหัสครู" });
-  }
-
-  if (!isValidTeacherCode(teacherCode)) {
-    return res.status(400).json({
-      ok: false,
-      message: `รหัสครูไม่ถูกต้อง ต้องเป็นตัวเลข ${TEACHER_CODE_MIN_LENGTH}-${TEACHER_CODE_MAX_LENGTH} หลัก`,
-    });
-  }
-
-  try {
-    const { data: existing, error: findError } = await supabase
-      .from("teachers")
-      .select("*")
-      .eq("teacher_code", teacherCode)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (!existing) {
-      return res.status(404).json({
-        ok: false,
-        message: "ไม่พบบัญชีครูนี้ในระบบ กรุณาสมัครสมาชิกก่อนที่แท็บสร้างบัญชี",
-      });
-    }
-
-    const { data: updated, error: updateError } = await supabase
-      .from("teachers")
-      .update({ last_login_at: new Date().toISOString() })
-      .eq("id", existing.id)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    const token = signToken({ role: "teacher", id: updated.id, name: updated.name });
-
-    return res.json({ ok: true, teacher: updated, token });
-  } catch (err) {
-    console.error("Teacher login error:", err.message);
-    return res.status(500).json({
-      ok: false,
-      message: "เชื่อมต่อฐานข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง หรือเช็คว่าตั้งค่าคีย์ Supabase ถูกต้องหรือยัง",
-    });
-  }
+// -------------------------------------------------------------
+// POST /api/register/teacher/cancel
+// body: { readerId } — ยกเลิกการสมัครก่อนหมดเวลาเอง (เช่น ครูกดยกเลิก
+// หรือหน้าเว็บถูกปิดไประหว่างรอ)
+// -------------------------------------------------------------
+router.post("/register/teacher/cancel", (req, res) => {
+  const reader = (req.body.readerId || "default").toString();
+  clearRegistration(reader);
+  return res.json({ ok: true });
 });
 
 // =================================================================
-// แอดมิน
+// แอดมิน — ไม่เปลี่ยนแปลงจากเดิม ยังคง login ด้วย username/password
+// เทียบกับ environment variable เท่านั้น
 // =================================================================
 
 // -------------------------------------------------------------

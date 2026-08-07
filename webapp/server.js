@@ -24,6 +24,9 @@ const authRoutes = require("./routes/auth");
 const tapRoutes = require("./routes/tap");
 const keysRoutes = require("./routes/keys");
 const adminRoomsRoutes = require("./routes/admin_rooms");
+// NOTE: keysRoutes ถูก require ไว้แล้วแต่ไม่เคย app.use() จริง — เป็นสาเหตุที่
+// หน้าเว็บ (login.html/teacher.html เดิม) เรียก /api/keys/* แล้ว 404 เพราะ
+// route ไม่เคยถูกต่อเข้าระบบเลย เพิ่ม mount ไว้ด้านล่างแล้ว
 const adminTeachersRoutes = require("./routes/admin_teachers");
 const adminKeysRoutes = require("./routes/admin_keys");
 
@@ -50,6 +53,16 @@ app.use("/api", authRoutes);
 //   /api/tap, /api/tap/session, /api/tap/session/clear
 // -------------------------------------------------------------
 app.use("/api", tapRoutes);
+
+// -------------------------------------------------------------
+// Keys routes — สาธารณะ ไม่ผ่าน requireAuth
+//   ครูไม่ login ผ่านเว็บอีกต่อไป (สถาปัตยกรรมใหม่) หน้าดูสถานะกุญแจ
+//   จึงต้องเป็นหน้าสาธารณะ ใครก็เข้าดูได้โดยไม่ต้องมี token
+//   /api/keys/status  (ดูได้)
+//   หมายเหตุ: /api/keys/history/mine ถูกตัดออกจาก keys.js แล้ว เพราะ
+//   ไม่มี "ผู้ใช้ที่ login" ให้อ้างอิงว่า "ตัวเอง" คือใครอีกต่อไป
+// -------------------------------------------------------------
+app.use("/api", keysRoutes);
 
 // -------------------------------------------------------------
 // Admin routes — ทุก /api/admin/* ต้อง login เป็นแอดมินก่อนเสมอ

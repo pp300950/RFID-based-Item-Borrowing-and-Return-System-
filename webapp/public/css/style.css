@@ -160,6 +160,34 @@ html, body {
   gap: 12px;
 }
 
+/* --- ปุ่มดูสถานะกุญแจทั้งหมด (แทนลิงก์ตัวหนังสือเดิม) --- */
+.status-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  background: var(--amber);
+  color: #0F1418;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 11px 20px;
+  border-radius: 999px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 22px rgba(232, 163, 61, 0.28);
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.status-link:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 10px 26px rgba(232, 163, 61, 0.38);
+}
+
+.status-link:active {
+  transform: scale(0.97);
+}
+
 /* --- ฝั่งขวา: การ์ดฟอร์ม --- */
 .pass-card {
   background: var(--panel);
@@ -239,6 +267,64 @@ html, body {
 /* --- แผงแต่ละบทบาท --- */
 .role-panel { display: none; }
 .role-panel.is-active { display: block; }
+
+/* --- ขั้นตอนของฟอร์มสมัครครู (กรอกฟอร์ม / รอแตะบัตร) ---
+   สำคัญ: ต้องซ่อนทุกขั้นตอนไว้ก่อนเป็นค่าเริ่มต้น (display:none) แล้วให้
+   JS เป็นคนเติม .is-active ให้ขั้นที่ควรโชว์เท่านั้น ไม่งั้นทั้งฟอร์มกับ
+   หน้าจอ "กำลังรอแตะบัตร" จะโชว์ซ้อนกันตั้งแต่โหลดหน้าเว็บครั้งแรก */
+.register-step {
+  display: none;
+}
+
+.register-step.is-active {
+  display: block;
+}
+
+.register-waiting {
+  text-align: center;
+  padding: 20px 10px 4px;
+}
+
+.waiting-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--violet);
+  margin: 0 auto 18px;
+  animation: pulse 1.6s infinite ease-in-out;
+}
+
+.waiting-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text-hi);
+  margin: 0 0 6px;
+}
+
+.waiting-sub {
+  font-size: 13px;
+  color: var(--text-mid);
+  margin: 0 0 22px;
+  line-height: 1.6;
+}
+
+.waiting-sub #waiting-countdown {
+  color: var(--violet);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+}
+
+.submit-btn--cancel {
+  background: transparent;
+  border: 1px solid var(--ink-line);
+  color: var(--text-mid);
+}
+
+.submit-btn--cancel:hover {
+  filter: none;
+  border-color: #E0645A;
+  color: #E0645A;
+}
 
 /* --- แท็บย่อย เข้าสู่ระบบ / สร้างบัญชี --- */
 .mode-row {

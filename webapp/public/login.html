@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>เข้าสู่ระบบ — ระบบยืม-คืนกุญแจ RFID</title>
+<title>ระบบยืม-คืนกุญแจ RFID</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css" />
@@ -17,13 +17,13 @@
       <aside class="brand-panel">
         <div class="brand-eyebrow">ACCESS PASS · SYSTEM ENTRY</div>
         <h1 class="brand-title">ระบบยืม–คืน<br />กุญแจด้วยบัตร RFID</h1>
-        <p class="brand-sub">แตะแท็กครูแล้วแตะแท็กกุญแจที่เครื่องอ่านหน้างานเพื่อยืม/คืน หรือเข้าสู่ระบบด้วยฟอร์มด้านขวาเพื่อดูสถานะ</p>
+        <p class="brand-sub">ครูแตะบัตรประจำตัวแล้วแตะแท็กกุญแจที่เครื่องอ่านหน้าห้องทะเบียนเพื่อยืม/คืน ครูใหม่สมัครบัตรได้ที่ฟอร์มด้านขวา</p>
 
         <ol class="brand-steps">
           <li>
             <span class="step-index">01</span>
             <div>
-              <div class="step-title">ครูแตะแท็กประจำตัว</div>
+              <div class="step-title">ครูแตะบัตรประจำตัว</div>
               <div class="step-desc">ระบบยืนยันตัวผู้ยืม/คืน</div>
             </div>
           </li>
@@ -43,6 +43,8 @@
           </li>
         </ol>
 
+        <a href="/teacher.html" class="status-link">ดูสถานะกุญแจทั้งหมด &rarr;</a>
+
         <div class="brand-footer">
           <span class="stamp">TEST&nbsp;BUILD</span>
           <span class="footer-text">เวอร์ชันทดสอบ · ข้อมูลเก็บบน Supabase</span>
@@ -58,35 +60,17 @@
         </div>
 
         <div class="role-row" role="tablist">
-          <button class="role-btn is-active" data-role="teacher" role="tab" aria-selected="true">ครู</button>
+          <button class="role-btn is-active" data-role="teacher" role="tab" aria-selected="true">สมัครครูใหม่</button>
           <button class="role-btn" data-role="admin" role="tab" aria-selected="false">แอดมิน</button>
         </div>
 
         <div class="perforation" aria-hidden="true"></div>
 
-        <!-- ================= ครู ================= -->
+        <!-- ================= ครู: สมัครด้วยการแตะบัตร ================= -->
         <section class="role-panel is-active" data-role-panel="teacher">
-          <div class="mode-row" role="tablist">
-            <button class="mode-btn is-active" data-mode="login" role="tab" aria-selected="true">เข้าสู่ระบบ</button>
-            <button class="mode-btn" data-mode="register" role="tab" aria-selected="false">สร้างบัญชี</button>
-          </div>
 
-          <!-- ครู: เข้าสู่ระบบ -->
-          <form id="form-teacher-login" class="pass-form mode-form is-active" data-mode-form="login" autocomplete="off">
-            <div class="field">
-              <label for="tl-code">รหัสครู</label>
-              <input type="text" id="tl-code" name="teacherCode" placeholder="เช่น 550123" inputmode="numeric" required />
-              <div class="field-hint">กรอกรหัสเดิมที่เคยสมัครไว้เพื่อเข้าสู่ระบบ</div>
-            </div>
-
-            <button type="submit" class="submit-btn submit-btn--teacher">
-              <span class="scan-dot" aria-hidden="true"></span>
-              เข้าสู่ระบบ
-            </button>
-          </form>
-
-          <!-- ครู: สร้างบัญชี -->
-          <form id="form-teacher-register" class="pass-form mode-form" data-mode-form="register" autocomplete="off">
+          <!-- ขั้นที่ 1: กรอกฟอร์ม -->
+          <form id="form-teacher-register" class="pass-form register-step is-active" data-register-step="form" autocomplete="off">
             <div class="field">
               <label for="tr-name">ชื่อ–นามสกุล</label>
               <input type="text" id="tr-name" name="name" placeholder="เช่น อ. สมหญิง ตั้งใจสอน" required />
@@ -97,17 +81,23 @@
               <input type="text" id="tr-department" name="department" placeholder="เช่น วิทยาศาสตร์" />
             </div>
 
-            <div class="field">
-              <label for="tr-code">รหัสครู</label>
-              <input type="text" id="tr-code" name="teacherCode" placeholder="เช่น 550123" inputmode="numeric" required />
-              <div class="field-hint">ตัวเลข 6-12 หลัก ใช้เข้าสู่ระบบครั้งถัดไป</div>
-            </div>
-
             <button type="submit" class="submit-btn submit-btn--teacher">
               <span class="scan-dot" aria-hidden="true"></span>
-              สร้างบัญชี
+              เริ่มสมัคร
             </button>
+            <div class="field-hint" style="text-align:center; margin-top:10px;">
+              กรอกแล้วไปแตะบัตรประจำตัวที่เครื่องอ่านหน้าห้องทะเบียน
+            </div>
           </form>
+
+          <!-- ขั้นที่ 2: กำลังรอแตะบัตร (แสดง/ซ่อนด้วย JS) -->
+          <div id="register-waiting" class="register-step register-waiting" data-register-step="waiting">
+            <div class="waiting-dot" aria-hidden="true"></div>
+            <p class="waiting-title">กรุณาไปแตะบัตรประจำตัว</p>
+            <p class="waiting-sub">ที่เครื่องอ่านหน้าห้องทะเบียนภายใน <span id="waiting-countdown">60</span> วินาที</p>
+            <button type="button" id="btn-cancel-register" class="submit-btn submit-btn--cancel">ยกเลิก</button>
+          </div>
+
         </section>
 
         <!-- ================= แอดมิน ================= -->

@@ -79,6 +79,10 @@
               <label for="room-desc">คำอธิบาย (ไม่บังคับ)</label>
               <input type="text" id="room-desc" name="description" placeholder="เช่น ห้องปฏิบัติการวิทย์" />
             </div>
+            <div class="field">
+              <label for="room-image">รูปภาพห้อง (ไม่บังคับ)</label>
+              <input type="file" id="room-image" name="image" accept="image/*" />
+            </div>
             <button type="submit" class="btn btn--admin">เพิ่มห้อง</button>
           </form>
         </div>
@@ -89,6 +93,7 @@
             <table class="admin-table">
               <thead>
                 <tr>
+                  <th>รูปภาพ</th>
                   <th>ชื่อห้อง</th>
                   <th>เลขแท็ก RFID</th>
                   <th>คำอธิบาย</th>
@@ -97,7 +102,7 @@
                 </tr>
               </thead>
               <tbody id="rooms-tbody">
-                <tr class="row-empty"><td colspan="5">กำลังโหลด...</td></tr>
+                <tr class="row-empty"><td colspan="6">กำลังโหลด...</td></tr>
               </tbody>
             </table>
           </div>
@@ -127,6 +132,7 @@
             <table class="admin-table">
               <thead>
                 <tr>
+                  <th>รูปภาพ</th>
                   <th>ชื่อห้อง/กุญแจ</th>
                   <th>เลขแท็ก RFID</th>
                   <th>สถานะ</th>
@@ -135,7 +141,7 @@
                 </tr>
               </thead>
               <tbody id="keys-tbody">
-                <tr class="row-empty"><td colspan="5">กำลังโหลด...</td></tr>
+                <tr class="row-empty"><td colspan="6">กำลังโหลด...</td></tr>
               </tbody>
             </table>
           </div>

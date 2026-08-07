@@ -72,6 +72,45 @@ const apiPatch = (url, body) => apiFetch(url, { method: "PATCH", body: JSON.stri
 const apiDelete = (url) => apiFetch(url, { method: "DELETE" });
 
 // -------------------------------------------------------------
+// apiUpload: เหมือน apiFetch แต่ส่ง FormData (ไม่ตั้ง Content-Type เอง
+// เพื่อให้ browser ใส่ multipart boundary ให้อัตโนมัติ)
+// -------------------------------------------------------------
+async function apiUpload(url, formData, method = "POST") {
+  const token = getToken();
+
+  if (!token) {
+    goToLogin();
+    return { ok: false, status: 401, data: { ok: false, message: "กรุณาเข้าสู่ระบบ" } };
+  }
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+  } catch (err) {
+    return { ok: false, status: 0, data: { ok: false, message: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง" } };
+  }
+
+  if (res.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    goToLogin();
+    return { ok: false, status: 401, data: { ok: false, message: "เซสชันหมดอายุ" } };
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    data = { ok: false, message: "เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง" };
+  }
+
+  return { ok: res.ok && data.ok, status: res.status, data };
+}
+
+// -------------------------------------------------------------
 // Toast
 // -------------------------------------------------------------
 const toastEl = document.getElementById("toast");
@@ -84,6 +123,67 @@ function showToast(message, type) {
   toastTimer = setTimeout(() => {
     toastEl.classList.remove("is-visible");
   }, 3200);
+}
+
+// -------------------------------------------------------------
+// Confirm dialog (แทน window.confirm ของเบราว์เซอร์ด้วยการ์ดสไตล์เดียวกับเว็บ)
+//   ใช้แบบ: const confirmed = await showConfirm("ยืนยันลบ...?");
+//   มีปุ่มกากบาทมุมขวาบน + ปุ่มยกเลิก/ยืนยัน กด Esc หรือคลิกฉากหลังก็ปิดได้
+//   (นับเป็น "ยกเลิก")
+// -------------------------------------------------------------
+let confirmOverlayEl = null;
+let confirmResolve = null;
+
+function ensureConfirmDialog() {
+  if (confirmOverlayEl) return;
+
+  confirmOverlayEl = document.createElement("div");
+  confirmOverlayEl.className = "confirm-overlay";
+  confirmOverlayEl.innerHTML = `
+    <div class="confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message">
+      <button type="button" class="confirm-close" aria-label="ปิด">&times;</button>
+      <p id="confirm-message" class="confirm-message"></p>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn--ghost confirm-cancel">ยกเลิก</button>
+        <button type="button" class="btn btn--danger confirm-ok">ยืนยัน</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(confirmOverlayEl);
+
+  const resolveWith = (value) => {
+    confirmOverlayEl.classList.remove("is-visible");
+    document.removeEventListener("keydown", onKeydown);
+    if (confirmResolve) {
+      confirmResolve(value);
+      confirmResolve = null;
+    }
+  };
+
+  const onKeydown = (e) => {
+    if (e.key === "Escape") resolveWith(false);
+  };
+
+  confirmOverlayEl.querySelector(".confirm-close").addEventListener("click", () => resolveWith(false));
+  confirmOverlayEl.querySelector(".confirm-cancel").addEventListener("click", () => resolveWith(false));
+  confirmOverlayEl.querySelector(".confirm-ok").addEventListener("click", () => resolveWith(true));
+  confirmOverlayEl.addEventListener("click", (e) => {
+    if (e.target === confirmOverlayEl) resolveWith(false);
+  });
+
+  confirmOverlayEl._resolveWith = resolveWith;
+  confirmOverlayEl._onKeydown = onKeydown;
+}
+
+function showConfirm(message) {
+  ensureConfirmDialog();
+  confirmOverlayEl.querySelector("#confirm-message").textContent = message;
+  confirmOverlayEl.classList.add("is-visible");
+  document.addEventListener("keydown", confirmOverlayEl._onKeydown);
+
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+  });
 }
 
 // -------------------------------------------------------------
@@ -183,15 +283,28 @@ async function loadRooms() {
 
 function renderRoomsTable() {
   if (state.rooms.length === 0) {
-    roomsTbody.innerHTML = `<tr class="row-empty"><td colspan="5">ยังไม่มีห้อง/กุญแจในระบบ — เพิ่มรายการแรกด้านบน</td></tr>`;
+    roomsTbody.innerHTML = `<tr class="row-empty"><td colspan="6">ยังไม่มีห้อง/กุญแจในระบบ — เพิ่มรายการแรกด้านบน</td></tr>`;
     return;
   }
 
   roomsTbody.innerHTML = state.rooms
     .map((room) => {
       const isActive = room.is_active !== false;
+      const thumbHtml = room.image_url
+        ? `<img class="room-thumb" src="${escapeHtml(room.image_url)}" alt="${escapeHtml(room.room_name)}" />`
+        : `<div class="room-thumb-placeholder">ไม่มีรูป</div>`;
+
       return `
         <tr data-room-id="${room.id}">
+          <td>
+            <div class="room-thumb-cell">
+              ${thumbHtml}
+              <label class="room-thumb-upload-label">
+                ${room.image_url ? "เปลี่ยนรูป" : "เพิ่มรูป"}
+                <input type="file" class="room-thumb-upload-input" data-action="upload-room-image" data-id="${room.id}" accept="image/*" />
+              </label>
+            </div>
+          </td>
           <td>
             <input class="edit-inline" data-field="room_name" value="${escapeHtml(room.room_name)}" />
           </td>
@@ -224,11 +337,25 @@ formRoomCreate.addEventListener("submit", async (e) => {
   const roomName = document.getElementById("room-name").value.trim();
   const tagUid = document.getElementById("room-tag").value.trim();
   const description = document.getElementById("room-desc").value.trim();
+  const imageInput = document.getElementById("room-image");
+  const imageFile = imageInput.files && imageInput.files[0] ? imageInput.files[0] : null;
 
   const { ok, data } = await apiPost("/api/admin/rooms", { roomName, tagUid, description });
 
   if (ok) {
-    showToast("เพิ่มห้อง/กุญแจสำเร็จ", "ok");
+    // ถ้ามีเลือกไฟล์รูปมาด้วย อัปโหลดต่อทันทีให้ห้องที่เพิ่งสร้าง
+    if (imageFile && data.room && data.room.id) {
+      const fd = new FormData();
+      fd.append("image", imageFile);
+      const uploadResult = await apiUpload(`/api/admin/rooms/${data.room.id}/image`, fd);
+      if (!uploadResult.ok) {
+        showToast("เพิ่มห้องสำเร็จ แต่อัปโหลดรูปไม่สำเร็จ — ลองอัปโหลดใหม่ในตารางด้านล่าง", "error");
+      } else {
+        showToast("เพิ่มห้อง/กุญแจพร้อมรูปสำเร็จ", "ok");
+      }
+    } else {
+      showToast("เพิ่มห้อง/กุญแจสำเร็จ", "ok");
+    }
     formRoomCreate.reset();
     await loadRooms();
   } else {
@@ -273,6 +400,34 @@ roomsTbody.addEventListener(
   true
 );
 
+// อัปโหลด/เปลี่ยนรูปห้องแบบ inline ในตาราง (input[type=file] ซ่อนอยู่
+// หลัง label "เพิ่มรูป"/"เปลี่ยนรูป")
+roomsTbody.addEventListener("change", async (e) => {
+  const input = e.target.closest('input[data-action="upload-room-image"]');
+  if (!input) return;
+
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const roomId = input.dataset.id;
+  const label = input.closest(".room-thumb-upload-label");
+  const originalText = label ? label.firstChild.textContent : "";
+  if (label) label.firstChild.textContent = "กำลังอัปโหลด...";
+
+  const fd = new FormData();
+  fd.append("image", file);
+
+  const { ok, data } = await apiUpload(`/api/admin/rooms/${roomId}/image`, fd);
+
+  if (ok) {
+    showToast("อัปโหลดรูปห้องสำเร็จ", "ok");
+    await loadRooms();
+  } else {
+    showToast(data.message || "อัปโหลดรูปไม่สำเร็จ", "error");
+    if (label) label.firstChild.textContent = originalText;
+  }
+});
+
 roomsTbody.addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-action]");
   if (!btn) return;
@@ -296,7 +451,7 @@ roomsTbody.addEventListener("click", async (e) => {
   if (btn.dataset.action === "delete-room") {
     const room = state.rooms.find((r) => String(r.id) === String(id));
     const label = room ? room.room_name : "ห้องนี้";
-    const confirmed = window.confirm(`ยืนยันลบ "${label}"?\nประวัติการยืม-คืนที่เกี่ยวข้องจะถูกลบไปด้วย และกู้คืนไม่ได้`);
+    const confirmed = await showConfirm(`ยืนยันลบ "${label}"? ประวัติการยืม-คืนที่เกี่ยวข้องจะถูกลบไปด้วย และกู้คืนไม่ได้`);
     if (!confirmed) return;
 
     btn.disabled = true;
@@ -396,7 +551,7 @@ teachersTbody.addEventListener("click", async (e) => {
   }
 
   if (btn.dataset.action === "delete-teacher-tag") {
-    const confirmed = window.confirm("ยืนยันลบแท็กของครูคนนี้?");
+    const confirmed = await showConfirm("ยืนยันลบแท็กของครูคนนี้?");
     if (!confirmed) return;
 
     btn.disabled = true;
@@ -445,9 +600,13 @@ function renderKeysTable() {
     .map((key) => {
       const isBorrowed = key.status === "borrowed";
       const holderName = isBorrowed && key.borrowed_by ? key.borrowed_by.name : "—";
+      const thumbHtml = key.image_url
+        ? `<img class="room-thumb" src="${escapeHtml(key.image_url)}" alt="${escapeHtml(key.room_name)}" />`
+        : `<div class="room-thumb-placeholder">ไม่มีรูป</div>`;
 
       return `
         <tr>
+          <td>${thumbHtml}</td>
           <td>${escapeHtml(key.room_name)}</td>
           <td>${escapeHtml(key.tag_uid || "ยังไม่ผูกแท็ก")}</td>
           <td>
