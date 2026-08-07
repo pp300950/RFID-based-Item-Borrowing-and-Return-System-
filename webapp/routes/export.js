@@ -3,10 +3,10 @@
 // Export endpoints สำหรับหน้าแอดมิน (ประวัติยืม-คืน) — เอาไว้ให้แอดมิน
 // กดดาวน์โหลดรายงานเป็นไฟล์ ไม่ใช่ดูในตารางบนเว็บอย่างเดียว
 //
-// Task 7a (นี้): route wiring + CSV เท่านั้น ไม่มี dependency เพิ่ม
-// Task 7b (ทีหลัง): เพิ่ม DOCX export ในไฟล์เดียวกันนี้ (ใช้ `docx` npm
-// package) — โครง route/query ด้านล่างออกแบบให้ query logic ใช้ร่วมกัน
-// ได้ระหว่างสอง format โดยไม่ต้อง duplicate
+// Task 7a: route wiring + CSV (ไม่มี dependency เพิ่ม)
+// Task 7b: DOCX export (ไฟล์นี้ — ใช้ `docx` npm package, ต้อง
+// `npm install docx` ก่อนรัน) — ใช้ query logic เดียวกับ CSV ผ่าน
+// fetchHistoryForExport() ร่วมกัน ไม่ duplicate การดึงข้อมูล
 //
 // Auth: mount แบบเดียวกับ admin_keys.js/admin_rooms.js (requireAuth +
 // requireRole("admin") ที่จุด mount ใน server.js) — ไฟล์นี้เองไม่เช็ค
@@ -16,11 +16,24 @@
 // admin_keys.js เพื่อให้ปุ่ม export บนหน้าแอดมินส่ง filter ปัจจุบันของ
 // ตารางที่กำลังดูอยู่ตรงๆ ได้เลย ไม่ต้อง map ชื่อ param ใหม่):
 //   roomTagId, teacherId, action ("borrow"|"return"), limit (default 100, max 500)
+//   format ("csv" | "docx", default "csv")
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabaseClient");
+const {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  AlignmentType,
+  HeadingLevel,
+} = require("docx");
 
 const EXPORT_LIMIT_DEFAULT = 100;
 const EXPORT_LIMIT_MAX = 500;
@@ -106,35 +119,172 @@ function buildCsv(rows) {
 }
 
 // -------------------------------------------------------------
-// GET /api/admin/keys/history/export?format=csv
+// formatDateTimeTh(iso) -> string
+// จัดรูปแบบวันเวลาแบบไทยสำหรับ DOCX (CSV ปล่อยเป็น ISO ดิบๆ ไว้ให้
+// Excel/สเปรดชีตแปลงเอง แต่ DOCX เป็นเอกสารอ่านเลย จึงจัดให้อ่านง่าย
+// ตรงนี้แทน) — ถ้า parse ไม่ได้ (ค่าว่าง/ผิดรูปแบบ) คืนสตริงเดิมไว้
+// เฉยๆ ไม่ throw เพื่อไม่ให้แถวเดียวที่ข้อมูลเพี้ยนทำให้ export ทั้งไฟล์พัง
+// -------------------------------------------------------------
+function formatDateTimeTh(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("th-TH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch (e) {
+    return String(iso);
+  }
+}
+
+// -------------------------------------------------------------
+// docxHeaderCell(text) / docxBodyCell(text) -> TableCell
+// สร้าง cell ของตาราง DOCX — แยกฟังก์ชัน header/body เพราะ header
+// ต้องตัวหนา + พื้นหลังเทาอ่อน ส่วน body เป็นข้อความปกติ ใช้ร่วมกันทุก
+// แถวเพื่อไม่ให้ style ของแต่ละ cell เพี้ยนไปมาระหว่างแถว
+// -------------------------------------------------------------
+function docxHeaderCell(text) {
+  return new TableCell({
+    width: { size: 20, type: WidthType.PERCENTAGE },
+    shading: { fill: "E8E8E8" },
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, size: 20 })],
+      }),
+    ],
+  });
+}
+
+function docxBodyCell(text) {
+  return new TableCell({
+    width: { size: 20, type: WidthType.PERCENTAGE },
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text: text || "-", size: 20 })],
+      }),
+    ],
+  });
+}
+
+// -------------------------------------------------------------
+// buildDocx(rows) -> Promise<Buffer>
+// เอกสาร Word: หัวเรื่อง + วันที่สร้างรายงาน + ตาราง 5 คอลัมน์เดียวกับ
+// CSV (วันเวลา, ห้อง/กุญแจ, ครู, แผนก, การกระทำ) คืนเป็น Buffer พร้อม
+// ส่งเป็น response body ตรงๆ (Packer.toBuffer ทำงานฝั่ง Node ได้เลย
+// ไม่ต้องผ่าน Blob/browser API)
+// -------------------------------------------------------------
+async function buildDocx(rows) {
+  const headerRow = new TableRow({
+    tableHeader: true,
+    children: CSV_HEADERS.map(docxHeaderCell),
+  });
+
+  const bodyRows = rows.map((row) => {
+    const roomName = row.room_tags ? row.room_tags.room_name : "";
+    const teacherName = row.teachers ? row.teachers.name : "";
+    const teacherDept = row.teachers ? row.teachers.department || "" : "";
+
+    return new TableRow({
+      children: [
+        docxBodyCell(formatDateTimeTh(row.acted_at)),
+        docxBodyCell(roomName),
+        docxBodyCell(teacherName),
+        docxBodyCell(teacherDept),
+        docxBodyCell(actionLabelTh(row.action)),
+      ],
+    });
+  });
+
+  const table = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [headerRow, ...bodyRows],
+  });
+
+  const generatedAtLine = new Paragraph({
+    children: [
+      new TextRun({
+        text: `สร้างรายงานเมื่อ: ${formatDateTimeTh(new Date().toISOString())}`,
+        size: 20,
+        color: "666666",
+      }),
+    ],
+    spacing: { after: 200 },
+  });
+
+  const emptyNote =
+    rows.length === 0
+      ? [
+          new Paragraph({
+            children: [
+              new TextRun({ text: "ไม่พบข้อมูลตามเงื่อนไขที่เลือก", italics: true }),
+            ],
+            spacing: { before: 200 },
+          }),
+        ]
+      : [];
+
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.LEFT,
+            children: [new TextRun({ text: "ประวัติการยืม-คืนกุญแจ" })],
+            spacing: { after: 100 },
+          }),
+          generatedAtLine,
+          table,
+          ...emptyNote,
+        ],
+      },
+    ],
+  });
+
+  return Packer.toBuffer(doc);
+}
+
+// -------------------------------------------------------------
+// GET /api/admin/keys/history/export?format=csv|docx
 // query params: roomTagId, teacherId, action, limit (เหมือน
-// /api/admin/keys/history) + format ("csv" เท่านั้นใน 7a — "docx" มา
-// ใน 7b)
+// /api/admin/keys/history) + format ("csv" default, หรือ "docx")
 // -------------------------------------------------------------
 router.get("/keys/history/export", async (req, res) => {
   const { format, roomTagId, teacherId, action, limit } = req.query;
 
   const fmt = (format || "csv").toString().toLowerCase();
 
-  if (fmt !== "csv") {
-    // 7b จะเพิ่ม case "docx" ตรงนี้ — ตอนนี้รองรับแค่ csv
+  if (fmt !== "csv" && fmt !== "docx") {
     return res.status(400).json({
       ok: false,
-      message: `รูปแบบไฟล์ "${fmt}" ยังไม่รองรับ (รองรับ: csv)`,
+      message: `รูปแบบไฟล์ "${fmt}" ยังไม่รองรับ (รองรับ: csv, docx)`,
     });
   }
 
   try {
     const rows = await fetchHistoryForExport({ roomTagId, teacherId, action, limit });
-    const csv = buildCsv(rows);
+    const dateStamp = new Date().toISOString().slice(0, 10);
 
-    const filename = `key-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    if (fmt === "docx") {
+      const buffer = await buildDocx(rows);
+      const filename = `key-history-${dateStamp}.docx`;
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      );
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.send(buffer);
+    }
+
+    const csv = buildCsv(rows);
+    const filename = `key-history-${dateStamp}.csv`;
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     return res.send(csv);
   } catch (err) {
-    console.error("Export history CSV error:", err.message);
+    console.error(`Export history ${fmt.toUpperCase()} error:`, err.message);
     return res.status(500).json({
       ok: false,
       message: "ส่งออกประวัติยืม-คืนไม่สำเร็จ",

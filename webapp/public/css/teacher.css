@@ -499,6 +499,362 @@
     .teacher-toast { transition: none; }
   }
   
+  /* =================================================================
+     Room detail modal (Task 9a shell) — สไตล์พื้นฐานพอให้ทดสอบได้
+     เต็มรูปแบบ (lightbox, responsive pass) มาใน Task 11a/11b ทีหลัง
+     ใช้ pattern เดียวกับ .confirm-overlay/.confirm-card ใน admin.css
+     (overlay เต็มจอ + การ์ดลอยกลาง) เพื่อให้ modal ทั้งระบบหน้าตา
+     สอดคล้องกัน แม้จะอยู่คนละไฟล์ CSS ก็ตาม
+     ================================================================= */
+  .room-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 20, 24, 0.62);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 200;
+  }
+
+  .room-modal-overlay.is-visible {
+    display: flex;
+  }
+
+  .room-modal-card {
+    position: relative;
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 86vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    padding: 26px 24px 24px;
+  }
+
+  .room-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--text-low);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .room-modal-close:hover {
+    background: var(--panel);
+    color: #E0645A;
+  }
+
+  .room-modal-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .room-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin: 0 24px 16px 0;
+  }
+
+  .room-modal-section {
+    margin-top: 4px;
+  }
+
+  .room-modal-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin: 0;
+  }
+
+  .room-modal-desc {
+    font-size: 12.5px;
+    color: var(--text-low);
+    margin: 4px 0 0;
+  }
+
+  /* --- แถบรูปภาพ (ยังไม่ใช่ lightbox — คลิกขยายมาใน Task 9b) --- */
+  .room-modal-images {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    margin-bottom: 18px;
+    border-radius: 10px;
+  }
+
+  .room-modal-image {
+    width: 140px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 10px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    cursor: zoom-in;
+    transition: opacity 0.15s ease, border-color 0.15s ease;
+  }
+
+  .room-modal-image:hover {
+    opacity: 0.85;
+    border-color: var(--violet);
+  }
+
+  .room-modal-image:focus-visible {
+    outline: 2px solid var(--violet);
+    outline-offset: 2px;
+  }
+
+  .room-modal-image-placeholder {
+    width: 100%;
+    height: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--text-low);
+    font-size: 12px;
+    background: var(--panel);
+    border: 1px dashed var(--ink-line);
+    border-radius: 10px;
+  }
+
+  .room-modal-status-line {
+    font-size: 13px;
+    color: var(--text-mid);
+    background: rgba(232, 163, 61, 0.10);
+    border: 1px solid rgba(232, 163, 61, 0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+
+  .room-modal-section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin: 0 0 10px;
+  }
+
+  .room-modal-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .room-modal-timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    padding: 8px 10px;
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 9px;
+    flex-wrap: wrap;
+  }
+
+  .room-modal-timeline-action {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .room-modal-timeline-action.is-borrow {
+    background: rgba(232, 163, 61, 0.18);
+    color: var(--amber);
+  }
+
+  .room-modal-timeline-action.is-return {
+    background: rgba(62, 156, 143, 0.18);
+    color: var(--teal);
+  }
+
+  .room-modal-timeline-who {
+    color: var(--text-hi);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .room-modal-timeline-when {
+    color: var(--text-low);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+
+  .room-modal-timeline-loading,
+  .room-modal-timeline-empty {
+    text-align: center;
+    padding: 18px 10px;
+    color: var(--text-low);
+    font-size: 12.5px;
+    border: 1px dashed var(--ink-line);
+    border-radius: 10px;
+  }
+
+  .room-modal-timeline-viewall {
+    display: block;
+    text-align: center;
+    margin-top: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--violet);
+    text-decoration: none;
+    padding: 8px 0;
+  }
+
+  .room-modal-timeline-viewall:hover {
+    text-decoration: underline;
+  }
+
+  body.modal-open {
+    overflow: hidden;
+  }
+
+  /* =================================================================
+     Lightbox (Task 9b) — ซ้อนทับ room modal อีกชั้น (z-index สูงกว่า
+     .room-modal-overlay ที่ 200) สร้างเข้า DOM ครั้งเดียวโดย JS
+     (document.body.appendChild) ไม่ได้อยู่ใน teacher.html เพราะเนื้อหา
+     เปลี่ยนตามรูปที่คลิก ไม่ใช่ markup คงที่แบบ room-modal-overlay
+     ================================================================= */
+  .room-lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 13, 16, 0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 300;
+  }
+
+  .room-lightbox-overlay.is-visible {
+    display: flex;
+  }
+
+  .room-lightbox-figure {
+    margin: 0;
+    max-width: min(88vw, 900px);
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .room-lightbox-image {
+    max-width: 100%;
+    max-height: 76vh;
+    object-fit: contain;
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  }
+
+  .room-lightbox-caption {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text-mid);
+    text-align: center;
+  }
+
+  .room-lightbox-close {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--ink-line);
+    background: rgba(38, 43, 51, 0.8);
+    color: var(--text-hi);
+    font-size: 24px;
+    line-height: 1;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .room-lightbox-close:hover {
+    border-color: #E0645A;
+    color: #E0645A;
+  }
+
+  .room-lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--ink-line);
+    background: rgba(38, 43, 51, 0.8);
+    color: var(--text-hi);
+    font-size: 20px;
+    line-height: 1;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+
+  .room-lightbox-nav:hover {
+    border-color: var(--violet);
+    color: var(--violet);
+  }
+
+  .room-lightbox-prev { left: 18px; }
+  .room-lightbox-next { right: 18px; }
+
+  .room-lightbox-close:focus-visible,
+  .room-lightbox-nav:focus-visible {
+    outline: 2px solid var(--violet);
+    outline-offset: 2px;
+  }
+
+  /* --- จอแคบ: ปุ่มเลื่อน/ปิดขยับเข้ามาให้กดง่ายขึ้น รูปเต็มความกว้าง --- */
+  @media (max-width: 640px) {
+    .room-lightbox-overlay { padding: 12px; }
+    .room-lightbox-figure { max-width: 100%; }
+    .room-lightbox-image { max-height: 62vh; }
+    .room-lightbox-close {
+      top: 10px;
+      right: 10px;
+      width: 36px;
+      height: 36px;
+    }
+    .room-lightbox-nav {
+      width: 38px;
+      height: 38px;
+    }
+    .room-lightbox-prev { left: 8px; }
+    .room-lightbox-next { right: 8px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .room-lightbox-close,
+    .room-lightbox-nav,
+    .room-modal-image {
+      transition: none;
+    }
+  }
+
   /* --- จอแคบ --- */
   @media (max-width: 640px) {
     .teacher-topbar { padding: 16px 18px; }

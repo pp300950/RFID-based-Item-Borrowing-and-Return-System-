@@ -60,6 +60,23 @@
 
   <div id="toast" class="teacher-toast" role="status" aria-live="polite"></div>
 
+  <!-- ============== Room detail modal (Task 9a/10) ==============
+       ซ่อนไว้ด้วย display:none ใน CSS เป็นค่าเริ่มต้นเสมอ (.room-modal-overlay
+       ไม่มี .is-visible) — JS เป็นคนเติม/ถอด class เดียวกับรูปแบบที่
+       admin.css ใช้กับ .confirm-overlay อยู่แล้ว เพื่อให้ pattern เปิด/ปิด
+       modal เหมือนกันทั้งระบบ ไม่ต้องคิดใหม่
+       โครงสร้างภายในถูกเติมด้วย JS ทั้งหมด (renderRoomDetail) เพราะ
+       เนื้อหาเปลี่ยนไปตามห้องที่คลิก — ไฟล์นี้มีแค่ overlay/card/ปุ่มปิด
+       เป็นเปลือกคงที่ -->
+  <div id="room-modal-overlay" class="room-modal-overlay">
+    <div class="room-modal-card" role="dialog" aria-modal="true" aria-labelledby="room-modal-title">
+      <button type="button" id="room-modal-close" class="room-modal-close" aria-label="ปิด">&times;</button>
+      <div id="room-modal-body" class="room-modal-body">
+        <!-- เติมด้วย JS: renderRoomDetail() -->
+      </div>
+    </div>
+  </div>
+
 <script src="/js/teacher.js"></script>
 </body>
 </html>
