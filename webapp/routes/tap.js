@@ -168,6 +168,11 @@ router.post("/tap", async (req, res) => {
           .insert({
             name: pending.name,
             department: pending.department,
+            // teachers.teacher_code เป็น NOT NULL ใน schema จริง แต่ flow
+            // สมัครผ่านการแตะบัตรนี้ไม่มีขั้นตอนให้ครูกรอกรหัสเอง จึงใช้
+            // tag_uid ของบัตรที่แตะเป็น teacher_code ไปเลย — รับประกัน
+            // ไม่ซ้ำอยู่แล้วเพราะ tag_uid มี unique constraint ในตัว
+            teacher_code: cleanTagUid,
             last_login_at: new Date().toISOString(),
           })
           .select()
