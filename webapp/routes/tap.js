@@ -65,6 +65,58 @@ function clearSession(readerId) {
 }
 
 // -------------------------------------------------------------
+// isWithinBorrowWindow(roomTag) -> boolean
+// เช็คว่า "ตอนนี้" (เวลาปัจจุบันของ server) อยู่ในช่วงที่อนุญาตให้ยืม
+// กุญแจดอกนี้ไหม ตาม roomTag.borrow_window_days / _start / _end
+//
+// กติกา (ตรงกับ schema.sql + Task 2a):
+//   - borrow_window_days: null/ว่าง = ไม่จำกัดวัน (ทุกวันผ่านเงื่อนไขนี้)
+//     ไม่ null = ต้องมีเลขวันปัจจุบัน (0=อาทิตย์..6=เสาร์) อยู่ในอาร์เรย์
+//   - borrow_window_start/_end: ต้องมาคู่กันเสมอ (การันตีจาก Task 2a
+//     validateBorrowWindow) — null ทั้งคู่ = ไม่จำกัดเวลา
+//   - รองรับช่วงข้ามเที่ยงคืน (เช่น 22:00–06:00): ถ้า start > end แปลว่า
+//     ช่วงเวลาที่อนุญาต "ข้ามคืน" ไปวันถัดไป เช็คแบบ (now >= start ||
+//     now <= end) แทนแบบปกติ (now >= start && now <= end)
+//   - เฉพาะการ "ยืม" เท่านั้นที่ถูกเช็คนี้กัน — การ "คืน" ไม่ต้องเรียก
+//     ฟังก์ชันนี้เลย (ดูจุดเรียกใช้ด้านล่าง)
+// -------------------------------------------------------------
+function isWithinBorrowWindow(roomTag) {
+  const now = new Date();
+
+  // --- เช็ควัน ---
+  const days = roomTag.borrow_window_days;
+  if (Array.isArray(days) && days.length > 0) {
+    const currentDay = now.getDay(); // 0=อาทิตย์..6=เสาร์ ตรงกับ schema
+    if (!days.includes(currentDay)) {
+      return false;
+    }
+  }
+
+  // --- เช็คเวลา ---
+  const start = roomTag.borrow_window_start;
+  const end = roomTag.borrow_window_end;
+
+  if (!start || !end) {
+    // ทั้งคู่ null (หรือฟิลด์ใดฟิลด์หนึ่งหายไปผิดปกติ) = ไม่จำกัดเวลา
+    return true;
+  }
+
+  // เทียบแบบ string "HH:MM:SS" ตรงๆ ได้เลย เพราะ postgres time type
+  // จะถูก serialize มาเป็นรูปแบบนี้เสมอผ่าน supabase-js และ string
+  // เทียบ lexicographic ตรงกับลำดับเวลาในหนึ่งวันพอดี
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const nowTimeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+
+  if (start <= end) {
+    // ช่วงปกติภายในวันเดียว
+    return nowTimeStr >= start && nowTimeStr <= end;
+  }
+
+  // ช่วงข้ามเที่ยงคืน (เช่น 22:00:00–06:00:00)
+  return nowTimeStr >= start || nowTimeStr <= end;
+}
+
+// -------------------------------------------------------------
 // POST /api/tap
 // body: { tagUid, readerId }
 // readerId: ตัวระบุเครื่องอ่าน (เผื่ออนาคตมีหลายเครื่อง) ถ้าไม่ส่งมา
@@ -72,7 +124,10 @@ function clearSession(readerId) {
 //
 // response ทุกกรณีมี field "state" บอกสถานะปัจจุบันให้หน้าจอแสดงผล:
 //   'session_started' | 'borrowed' | 'returned' | 'wrong_teacher' |
-//   'unknown_tag' | 'session_expired'
+//   'unknown_tag' | 'session_expired' | 'outside_window'
+//   ('outside_window' เพิ่มใหม่ — Task 6: ยืมถูกบล็อกเพราะอยู่นอกช่วง
+//   เวลาที่อนุญาต ดู isWithinBorrowWindow ด้านล่าง — ใช้กับ "ยืม" เท่านั้น
+//   "คืน" ไม่มี state นี้เกิดขึ้นได้เลยเพราะไม่ถูกเช็คช่วงเวลา)
 // -------------------------------------------------------------
 router.post("/tap", async (req, res) => {
   const { tagUid, readerId } = req.body;
@@ -134,7 +189,10 @@ router.post("/tap", async (req, res) => {
     // --- ไม่ใช่แท็กครู -> เช็คว่าเป็นแท็กกุญแจไหม ---
     const { data: roomTag, error: roomTagError } = await supabase
       .from("room_tags")
-      .select("id, room_name, status, borrowed_by_teacher_id, borrowed_by:borrowed_by_teacher_id(id, name)")
+      .select(
+        "id, room_name, status, borrowed_by_teacher_id, borrowed_by:borrowed_by_teacher_id(id, name), " +
+          "borrow_window_days, borrow_window_start, borrow_window_end"
+      )
       .eq("tag_uid", cleanTagUid)
       .maybeSingle();
 
@@ -229,7 +287,18 @@ router.post("/tap", async (req, res) => {
 
     // --- ตัดสินใจ borrow หรือ return ---
     if (roomTag.status === "available") {
-      // ยืม
+      // ยืม — เช็คช่วงเวลาที่อนุญาตก่อนเสมอ (การคืนไม่ต้องเช็คนี้เลย —
+      // ดู isWithinBorrowWindow ด้านบนและ constraint ที่ล็อกไว้ใน MANIFEST:
+      // "คืน" ต้องทำได้เสมอไม่ว่ากรณีใด กันครูค้างกุญแจเพราะติดช่วงห้ามยืม)
+      if (!isWithinBorrowWindow(roomTag)) {
+        return res.status(409).json({
+          ok: false,
+          state: "outside_window",
+          message: `กุญแจ "${roomTag.room_name}" ยืมได้เฉพาะในช่วงเวลาที่กำหนดเท่านั้น กรุณาลองใหม่ในช่วงเวลาที่อนุญาต`,
+          room: { id: roomTag.id, roomName: roomTag.room_name },
+        });
+      }
+
       const { data: updated, error: updateError } = await supabase
         .from("room_tags")
         .update({

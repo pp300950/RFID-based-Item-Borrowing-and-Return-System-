@@ -29,6 +29,7 @@ const adminRoomsRoutes = require("./routes/admin_rooms");
 // route ไม่เคยถูกต่อเข้าระบบเลย เพิ่ม mount ไว้ด้านล่างแล้ว
 const adminTeachersRoutes = require("./routes/admin_teachers");
 const adminKeysRoutes = require("./routes/admin_keys");
+const exportRoutes = require("./routes/export");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -85,6 +86,16 @@ app.use(
   requireAuth,
   requireRole("admin"),
   adminKeysRoutes
+);
+// export.js เอง (ดูคอมเมนต์หัวไฟล์) ไม่เช็ค auth ซ้ำในตัวเอง — คาดหวังว่า
+// จะถูก mount ผ่านกลุ่ม requireAuth + requireRole("admin") เดียวกับไฟล์
+// route แอดมินอื่นๆ ทั้งหมดข้างบนนี้ (admin_rooms.js/admin_teachers.js/
+// admin_keys.js) จึงต่อไว้ตรงนี้เป็นตัวสุดท้ายในกลุ่มเดียวกัน
+app.use(
+  "/api/admin",
+  requireAuth,
+  requireRole("admin"),
+  exportRoutes
 );
 
 // -------------------------------------------------------------
