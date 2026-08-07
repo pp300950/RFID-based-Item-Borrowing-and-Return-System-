@@ -9,487 +9,510 @@
    ตราประทับสองด้าน สื่อถึงการ "เซ็นผ่าน" หรือ "ตีกลับ" คำขอจริงๆ
    ================================================================= */
 
-.teacher-shell {
-  min-height: 100vh;
-  background:
-    radial-gradient(circle at 15% 0%, rgba(139, 127, 209, 0.09), transparent 40%),
-    var(--ink);
-}
-
-.teacher-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 32px;
-  border-bottom: 1px solid var(--ink-line);
-  background: var(--panel);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.teacher-brand-eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  color: var(--violet);
-  margin-bottom: 6px;
-}
-
-.teacher-brand-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.teacher-user-block {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.teacher-user-name {
-  font-size: 13.5px;
-  color: var(--text-mid);
-  text-align: right;
-}
-
-.teacher-user-name strong {
-  display: block;
-  color: var(--text-hi);
-  font-size: 14.5px;
-}
-
-.logout-btn {
-  border: 1px solid var(--ink-line);
-  background: transparent;
-  color: var(--text-mid);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 9px 16px;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-  white-space: nowrap;
-}
-
-.logout-btn:hover {
-  border-color: #E0645A;
-  color: #E0645A;
-}
-
-.teacher-main {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 32px 24px 60px;
-}
-
-.teacher-section-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-hi);
-  margin: 0 0 4px;
-}
-
-.teacher-section-sub {
-  font-size: 12.5px;
-  color: var(--text-low);
-  margin: 0 0 18px;
-}
-
-/* --- คิวอนุมัติ (ของห้องที่ตัวเองดูแล) --- */
-.approval-queue {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 40px;
-}
-
-.approval-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: var(--panel-2);
-  border: 1px solid var(--violet);
-  border-left-width: 3px;
-  border-radius: 12px;
-  padding: 14px 18px;
-  flex-wrap: wrap;
-}
-
-.approval-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  flex: 1 1 240px;
-}
-
-.approval-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--violet);
-  flex-shrink: 0;
-  animation: pulse 1.6s infinite ease-in-out;
-}
-
-.approval-text { min-width: 0; }
-
-.approval-item-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-hi);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.approval-action-label {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  color: var(--violet);
-  border: 1px solid var(--violet);
-  border-radius: 6px;
-  padding: 2px 7px;
-  margin-right: 8px;
-}
-
-.approval-meta {
-  font-size: 12px;
-  color: var(--text-low);
-  margin-top: 2px;
-}
-
-.approval-buttons {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.35; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1); }
-}
-
-/* --- Filter row --- */
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-
-.filter-row label {
-  font-size: 12.5px;
-  color: var(--text-mid);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.filter-row select,
-.filter-row input {
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 13px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  outline: none;
-}
-
-.filter-row input {
-  font-family: 'IBM Plex Mono', monospace;
-  flex: 1 1 200px;
-}
-
-.filter-row select:focus,
-.filter-row input:focus {
-  border-color: var(--violet);
-  box-shadow: 0 0 0 3px rgba(139, 127, 209, 0.20);
-}
-
-/* --- Item cards grid --- */
-.items-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
-}
-
-.item-card {
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 14px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: border-color 0.15s ease;
-}
-
-.item-card:hover {
-  border-color: var(--text-low);
-}
-
-/* --- รูปภาพห้อง (ด้านบนการ์ด) --- */
-.item-card-image-wrap {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: var(--panel-2);
-  flex-shrink: 0;
-}
-
-.item-card-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.item-card-image-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-low);
-  font-size: 12px;
-  text-align: center;
-  gap: 6px;
-  flex-direction: column;
-}
-
-.item-card-image-placeholder svg {
-  opacity: 0.5;
-}
-
-/* pill สถานะลอยทับมุมขวาบนของรูป แทนที่จะแย่งที่กับชื่อห้อง */
-.item-card-image-wrap .pill {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-.item-card-body {
-  padding: 14px 16px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-}
-
-.item-card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.item-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-hi);
-  line-height: 1.35;
-}
-
-.item-room {
-  font-size: 12px;
-  color: var(--text-low);
-  margin-top: 4px;
-}
-
-.item-card-meta {
-  font-size: 12.5px;
-  color: var(--text-mid);
-  line-height: 1.5;
-}
-
-/* --- ระยะเวลายืม (นับตั้งแต่ borrowed_at ถึงปัจจุบัน, อัปเดตสด) --- */
-.item-borrowed-duration {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--amber);
-  background: rgba(232, 163, 61, 0.12);
-  border: 1px solid rgba(232, 163, 61, 0.30);
-  border-radius: 8px;
-  padding: 6px 10px;
-  width: fit-content;
-}
-
-.item-borrowed-duration .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--amber);
-  flex-shrink: 0;
-  animation: pulse 1.6s infinite ease-in-out;
-}
-
-.pill {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.pill--available { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
-.pill--borrowed { background: rgba(232, 163, 61, 0.18); color: var(--amber); }
-.pill--mine { background: rgba(139, 127, 209, 0.18); color: var(--violet); }
-
-.item-card-action .btn { width: 100%; }
-
-.btn {
-  border: none;
-  border-radius: 9px;
-  padding: 11px 0;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-weight: 700;
-  font-size: 13.5px;
-  cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.btn:active { transform: scale(0.98); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-.btn--borrow {
-  background: var(--teal);
-  color: #0F1418;
-}
-.btn--borrow:hover:not(:disabled) { filter: brightness(1.08); }
-
-.btn--return {
-  background: var(--violet);
-  color: #0F1418;
-}
-.btn--return:hover:not(:disabled) { filter: brightness(1.08); }
-
-.btn--disabled-state {
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  color: var(--text-low);
-  cursor: not-allowed;
-}
-
-.btn--cancel {
-  background: transparent;
-  border: 1px solid var(--ink-line);
-  color: var(--text-mid);
-  padding: 8px 14px;
-  font-size: 12.5px;
-  flex-shrink: 0;
-}
-.btn--cancel:hover:not(:disabled) {
-  border-color: #E0645A;
-  color: #E0645A;
-}
-
-/* --- ปุ่มอนุมัติ / ปฏิเสธ ในคิว --- */
-.btn--approve {
-  background: var(--teal);
-  color: #0F1418;
-  padding: 9px 16px;
-  font-size: 12.5px;
-}
-.btn--approve:hover:not(:disabled) { filter: brightness(1.08); }
-
-.btn--reject {
-  background: transparent;
-  border: 1px solid #E0645A;
-  color: #E0645A;
-  padding: 9px 16px;
-  font-size: 12.5px;
-}
-.btn--reject:hover:not(:disabled) {
-  background: rgba(224, 100, 90, 0.10);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 48px 20px;
-  color: var(--text-low);
-  font-size: 13.5px;
-  border: 1px dashed var(--ink-line);
-  border-radius: 14px;
-}
-
-.empty-state--queue {
-  padding: 22px 20px;
-  margin-bottom: 40px;
-}
-
-/* --- Toast --- */
-.teacher-toast {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%) translateY(12px);
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  color: var(--text-hi);
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 12px 20px;
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 100;
-  max-width: 90vw;
-  text-align: center;
-}
-
-.teacher-toast.is-visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.teacher-toast.ok { border-color: var(--teal); }
-.teacher-toast.error { border-color: #E0645A; }
-
-/* --- Accessibility --- */
-.btn:focus-visible,
-select:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--violet);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .approval-dot { animation: none; }
-  .teacher-toast { transition: none; }
-}
-
-/* --- จอแคบ --- */
-@media (max-width: 640px) {
-  .teacher-topbar { padding: 16px 18px; }
-  .teacher-user-name { display: none; }
-  .teacher-main { padding: 24px 16px 48px; }
-
-  .approval-card {
+   .teacher-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(139, 127, 209, 0.09), transparent 40%),
+      var(--ink);
+  }
+  
+  .teacher-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 32px;
+    border-bottom: 1px solid var(--ink-line);
+    background: var(--panel);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .teacher-brand-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    color: var(--violet);
+    margin-bottom: 6px;
+  }
+  
+  .teacher-brand-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+  }
+  
+  .teacher-user-block {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .teacher-user-name {
+    font-size: 13.5px;
+    color: var(--text-mid);
+    text-align: right;
+  }
+  
+  .teacher-user-name strong {
+    display: block;
+    color: var(--text-hi);
+    font-size: 14.5px;
+  }
+  
+  .logout-btn {
+    border: 1px solid var(--ink-line);
+    background: transparent;
+    color: var(--text-mid);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+  
+  .logout-btn:hover {
+    border-color: #E0645A;
+    color: #E0645A;
+  }
+  
+  .teacher-main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+  }
+  
+  .teacher-section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin: 0 0 4px;
+  }
+  
+  .teacher-section-sub {
+    font-size: 12.5px;
+    color: var(--text-low);
+    margin: 0 0 18px;
+  }
+  
+  /* --- คิวอนุมัติ (ของห้องที่ตัวเองดูแล) --- */
+  .approval-queue {
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 40px;
   }
+  
+  .approval-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: var(--panel-2);
+    border: 1px solid var(--violet);
+    border-left-width: 3px;
+    border-radius: 12px;
+    padding: 14px 18px;
+    flex-wrap: wrap;
+  }
+  
+  .approval-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1 1 240px;
+  }
+  
+  .approval-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--violet);
+    flex-shrink: 0;
+    animation: pulse 1.6s infinite ease-in-out;
+  }
+  
+  .approval-text { min-width: 0; }
+  
+  .approval-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-hi);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .approval-action-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--violet);
+    border: 1px solid var(--violet);
+    border-radius: 6px;
+    padding: 2px 7px;
+    margin-right: 8px;
+  }
+  
+  .approval-meta {
+    font-size: 12px;
+    color: var(--text-low);
+    margin-top: 2px;
+  }
+  
   .approval-buttons {
-    width: 100%;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
   }
-  .approval-buttons .btn { flex: 1; }
-
-  .items-grid { grid-template-columns: 1fr; }
-}
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+  
+  /* --- Filter row --- */
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  
+  .filter-row label {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  
+  .filter-row select,
+  .filter-row input {
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    outline: none;
+  }
+  
+  .filter-row input {
+    font-family: 'IBM Plex Mono', monospace;
+    flex: 1 1 200px;
+  }
+  
+  .filter-row select:focus,
+  .filter-row input:focus {
+    border-color: var(--violet);
+    box-shadow: 0 0 0 3px rgba(139, 127, 209, 0.20);
+  }
+  
+  /* --- Item cards grid --- */
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  
+  .item-card {
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s ease;
+  }
+  
+  .item-card:hover {
+    border-color: var(--text-low);
+  }
+  
+  /* --- รูปภาพห้อง (ด้านบนการ์ด) --- */
+  .item-card-image-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: var(--panel-2);
+    flex-shrink: 0;
+  }
+  
+  .item-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  
+  .item-card-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-low);
+    font-size: 12px;
+    text-align: center;
+    gap: 6px;
+    flex-direction: column;
+  }
+  
+  .item-card-image-placeholder svg {
+    opacity: 0.5;
+  }
+  
+  /* เงาไล่ระดับสีดำที่มุมขวาบนของรูป (คลุมพื้นหลัง pill ให้อ่านออกเสมอ
+     ไม่ว่ารูปห้องด้านล่างจะสว่าง/หลากสีแค่ไหน — ทำแบบ vignette มุมเดียว
+     ไม่ทึบทั้งรูป เพื่อไม่ให้บังรายละเอียดภาพส่วนอื่น) */
+  .item-card-image-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(130px 100px at 100% 0%, rgba(0, 0, 0, 0.68), transparent 72%);
+    pointer-events: none;
+  }
+  
+  /* pill สถานะลอยทับมุมขวาบนของรูป แทนที่จะแย่งที่กับชื่อห้อง
+     พื้นหลัง pill เดิมโปร่งใสมาก (ตั้งใจให้กลืนกับพื้นเว็บสีเข้ม) ซึ่งพอ
+     ไปลอยบนรูปถ่ายจริง (มีส่วนสว่าง/หลากสี) จะอ่านไม่ออก จึงเพิ่มพื้นหลัง
+     ทึบ + ขอบบางๆ เฉพาะตอนอยู่บนรูปเท่านั้น (ที่อื่น เช่นในตาราง ยังคง
+     หน้าตาเดิม) */
+  .item-card-image-wrap .pill {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1;
+    background: rgba(20, 22, 26, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(3px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  }
+  
+  .item-card-image-wrap .pill--available { color: var(--teal); }
+  .item-card-image-wrap .pill--borrowed { color: var(--amber); }
+  .item-card-image-wrap .pill--mine { color: var(--violet); }
+  
+  .item-card-body {
+    padding: 14px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+  
+  .item-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  
+  .item-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-hi);
+    line-height: 1.35;
+  }
+  
+  .item-room {
+    font-size: 12px;
+    color: var(--text-low);
+    margin-top: 4px;
+  }
+  
+  .item-card-meta {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    line-height: 1.5;
+  }
+  
+  /* --- ระยะเวลายืม (นับตั้งแต่ borrowed_at ถึงปัจจุบัน, อัปเดตสด) --- */
+  .item-borrowed-duration {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--amber);
+    background: rgba(232, 163, 61, 0.12);
+    border: 1px solid rgba(232, 163, 61, 0.30);
+    border-radius: 8px;
+    padding: 6px 10px;
+    width: fit-content;
+  }
+  
+  .item-borrowed-duration .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    flex-shrink: 0;
+    animation: pulse 1.6s infinite ease-in-out;
+  }
+  
+  .pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  
+  .pill--available { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
+  .pill--borrowed { background: rgba(232, 163, 61, 0.18); color: var(--amber); }
+  .pill--mine { background: rgba(139, 127, 209, 0.18); color: var(--violet); }
+  
+  .item-card-action .btn { width: 100%; }
+  
+  .btn {
+    border: none;
+    border-radius: 9px;
+    padding: 11px 0;
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  
+  .btn--borrow {
+    background: var(--teal);
+    color: #0F1418;
+  }
+  .btn--borrow:hover:not(:disabled) { filter: brightness(1.08); }
+  
+  .btn--return {
+    background: var(--violet);
+    color: #0F1418;
+  }
+  .btn--return:hover:not(:disabled) { filter: brightness(1.08); }
+  
+  .btn--disabled-state {
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    color: var(--text-low);
+    cursor: not-allowed;
+  }
+  
+  .btn--cancel {
+    background: transparent;
+    border: 1px solid var(--ink-line);
+    color: var(--text-mid);
+    padding: 8px 14px;
+    font-size: 12.5px;
+    flex-shrink: 0;
+  }
+  .btn--cancel:hover:not(:disabled) {
+    border-color: #E0645A;
+    color: #E0645A;
+  }
+  
+  /* --- ปุ่มอนุมัติ / ปฏิเสธ ในคิว --- */
+  .btn--approve {
+    background: var(--teal);
+    color: #0F1418;
+    padding: 9px 16px;
+    font-size: 12.5px;
+  }
+  .btn--approve:hover:not(:disabled) { filter: brightness(1.08); }
+  
+  .btn--reject {
+    background: transparent;
+    border: 1px solid #E0645A;
+    color: #E0645A;
+    padding: 9px 16px;
+    font-size: 12.5px;
+  }
+  .btn--reject:hover:not(:disabled) {
+    background: rgba(224, 100, 90, 0.10);
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-low);
+    font-size: 13.5px;
+    border: 1px dashed var(--ink-line);
+    border-radius: 14px;
+  }
+  
+  .empty-state--queue {
+    padding: 22px 20px;
+    margin-bottom: 40px;
+  }
+  
+  /* --- Toast --- */
+  .teacher-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    color: var(--text-hi);
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 12px 20px;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 100;
+    max-width: 90vw;
+    text-align: center;
+  }
+  
+  .teacher-toast.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  
+  .teacher-toast.ok { border-color: var(--teal); }
+  .teacher-toast.error { border-color: #E0645A; }
+  
+  /* --- Accessibility --- */
+  .btn:focus-visible,
+  select:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--violet);
+    outline-offset: 2px;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .approval-dot { animation: none; }
+    .teacher-toast { transition: none; }
+  }
+  
+  /* --- จอแคบ --- */
+  @media (max-width: 640px) {
+    .teacher-topbar { padding: 16px 18px; }
+    .teacher-user-name { display: none; }
+    .teacher-main { padding: 24px 16px 48px; }
+  
+    .approval-card {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .approval-buttons {
+      width: 100%;
+    }
+    .approval-buttons .btn { flex: 1; }
+  
+    .items-grid { grid-template-columns: 1fr; }
+  }

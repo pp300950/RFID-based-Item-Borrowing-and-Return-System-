@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบยืม-คืนกุญแจ RFID</title>
+<style>
+  :root {
+    --bg-1: #0f0f1a;
+    --bg-2: #1a1a2e;
+    --accent: #7c9eff;
+    --accent-glow: #7c9effaa;
+    --good: #4ade80;
+    --good-glow: #4ade8088;
+    --bad: #f87171;
+    --bad-glow: #f8717188;
+    --warn: #fbbf24;
+    --warn-glow: #fbbf2488;
+    --text-main: #f3f4f6;
+    --text-dim: #9098b8;
+    --card-bg: #1e1e35;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 20%, var(--bg-2), var(--bg-1) 70%);
+    font-family: "Segoe UI", "Tahoma", "Sarabun", sans-serif;
+    color: var(--text-main);
+  }
+
+  #stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    transition: background 0.6s ease;
+  }
+
+  /* ----- ambient particles ----- */
+  #particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.12;
+    filter: blur(1px);
+    animation: float 14s linear infinite;
+  }
+  @keyframes float {
+    0%   { transform: translateY(110vh) translateX(0) scale(1); }
+    100% { transform: translateY(-10vh) translateX(30px) scale(1.4); opacity: 0; }
+  }
+
+  /* ----- header / connection status ----- */
+  #topbar {
+    position: fixed;
+    top: 24px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    z-index: 5;
+  }
+  #conn-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--bad);
+    box-shadow: 0 0 8px var(--bad-glow);
+    transition: all 0.3s ease;
+  }
+  #conn-dot.online {
+    background: var(--good);
+    box-shadow: 0 0 8px var(--good-glow);
+  }
+
+  /* ----- main icon ----- */
+  #icon-wrap {
+    position: relative;
+    width: 190px;
+    height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    z-index: 2;
+  }
+  #icon-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid var(--accent);
+    opacity: 0.35;
+    animation: pulse-ring 2.4s ease-out infinite;
+  }
+  #icon-ring::before {
+    content: "";
+    position: absolute;
+    inset: -18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    opacity: 0.5;
+    animation: pulse-ring 2.4s ease-out infinite 0.4s;
+  }
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.85); opacity: 0.55; }
+    80%  { transform: scale(1.35); opacity: 0; }
+    100% { transform: scale(1.35); opacity: 0; }
+  }
+  #icon-core {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #23233f, #171728);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 1px #33335533, inset 0 0 30px #00000066, 0 0 40px var(--accent-glow);
+    transition: box-shadow 0.5s ease, background 0.5s ease, transform 0.25s ease;
+  }
+  #icon-core svg { width: 64px; height: 64px; }
+
+  #icon-core.good { box-shadow: 0 0 0 1px #33335533, inset 0 0 30px #00000066, 0 0 55px var(--good-glow); }
+  #icon-core.bad  { box-shadow: 0 0 0 1px #33335533, inset 0 0 30px #00000066, 0 0 55px var(--bad-glow); }
+  #icon-core.warn { box-shadow: 0 0 0 1px #33335533, inset 0 0 30px #00000066, 0 0 55px var(--warn-glow); }
+  #icon-core.pop  { transform: scale(1.08); }
+
+  /* ----- text block ----- */
+  #headline {
+    font-size: 42px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    z-index: 2;
+    transition: color 0.4s ease;
+    max-width: 900px;
+  }
+  #subline {
+    font-size: 20px;
+    color: var(--text-dim);
+    max-width: 720px;
+    line-height: 1.6;
+    z-index: 2;
+    min-height: 32px;
+  }
+
+  /* ----- session card (teacher active) ----- */
+  #session-card {
+    margin-top: 34px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    background: var(--card-bg);
+    border: 1px solid #33335f;
+    border-radius: 20px;
+    padding: 22px 40px;
+    z-index: 2;
+    box-shadow: 0 8px 30px #00000055;
+  }
+  #session-card.show { display: flex; animation: rise 0.4s ease; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  #teacher-name {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  #countdown-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #countdown-ring {
+    width: 46px;
+    height: 46px;
+    transform: rotate(-90deg);
+  }
+  #countdown-ring circle {
+    fill: none;
+    stroke-width: 4;
+  }
+  #countdown-bg { stroke: #33335f; }
+  #countdown-fg {
+    stroke: var(--accent);
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.25s linear, stroke 0.3s ease;
+  }
+  #countdown-num {
+    font-size: 16px;
+    color: var(--text-dim);
+    min-width: 130px;
+    text-align: left;
+  }
+  #done-btn {
+    margin-top: 4px;
+    background: transparent;
+    border: 1px solid #44446a;
+    color: var(--text-dim);
+    padding: 8px 22px;
+    border-radius: 999px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  #done-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ----- flash overlay on result ----- */
+  #flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 1;
+  }
+  #flash.good { background: radial-gradient(circle at 50% 45%, var(--good-glow), transparent 60%); }
+  #flash.bad  { background: radial-gradient(circle at 50% 45%, var(--bad-glow), transparent 60%); }
+  #flash.play { animation: flash-anim 0.7s ease-out; }
+  @keyframes flash-anim {
+    0%   { opacity: 0.9; }
+    100% { opacity: 0; }
+  }
+
+  /* ----- toast history (bottom) ----- */
+  #toast-log {
+    position: fixed;
+    bottom: 28px;
+    left: 0; right: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 8px;
+    z-index: 4;
+    pointer-events: none;
+  }
+  .toast {
+    font-size: 13px;
+    color: var(--text-dim);
+    background: #1a1a2ecc;
+    border: 1px solid #2e2e50;
+    padding: 6px 16px;
+    border-radius: 999px;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: toast-in 0.35s ease forwards, toast-out 0.5s ease forwards 4s;
+    backdrop-filter: blur(6px);
+  }
+  @keyframes toast-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes toast-out {
+    to { opacity: 0; transform: translateY(-6px); }
+  }
+
+  /* clock */
+  #clock {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    font-size: 15px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    z-index: 5;
+  }
+
+  /* shake animation for errors */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(7px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(4px); }
+  }
+  .shake { animation: shake 0.4s ease; }
+</style>
+</head>
+<body>
+
+<div id="particles"></div>
+<div id="flash"></div>
+
+<div id="topbar">
+  <span id="conn-dot"></span>
+  <span id="conn-text">กำลังเชื่อมต่อ...</span>
+</div>
+<div id="clock"></div>
+
+<div id="stage">
+  <div id="icon-wrap">
+    <div id="icon-ring"></div>
+    <div id="icon-core">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path id="icon-path" d="M12 2C9.24 2 7 4.24 7 7c0 2.05 1.23 3.81 3 4.58V14a2 2 0 0 0 2 2h.5l-1.5 3h4l-2-3H14a2 2 0 0 0 2-2v-2.42c1.77-.77 3-2.53 3-4.58 0-2.76-2.24-5-5-5z"
+          fill="#7c9eff"/>
+      </svg>
+    </div>
+  </div>
+
+  <div id="headline">พร้อมรับการแตะบัตร</div>
+  <div id="subline">แตะแท็กประจำตัวครูก่อน แล้วค่อยแตะแท็กกุญแจที่ต้องการยืม/คืน</div>
+
+  <div id="session-card">
+    <div id="teacher-name">—</div>
+    <div id="countdown-wrap">
+      <svg id="countdown-ring" viewBox="0 0 50 50">
+        <circle id="countdown-bg" cx="25" cy="25" r="21"></circle>
+        <circle id="countdown-fg" cx="25" cy="25" r="21" stroke-dasharray="132" stroke-dashoffset="0"></circle>
+      </svg>
+      <div id="countdown-num">เหลือเวลา 20 วิ</div>
+    </div>
+    <button id="done-btn">เสร็จสิ้น ✕</button>
+  </div>
+</div>
+
+<div id="toast-log"></div>
+
+<script>
+// ===================================================================
+// display.html — หน้าจอเต็มจอ รับ event จาก rfid_bridge.py ผ่าน SSE
+// ===================================================================
+
+const ICONS = {
+  idle: '<path d="M12 2C9.24 2 7 4.24 7 7c0 2.05 1.23 3.81 3 4.58V14a2 2 0 0 0 2 2h.5l-1.5 3h4l-2-3H14a2 2 0 0 0 2-2v-2.42c1.77-.77 3-2.53 3-4.58 0-2.76-2.24-5-5-5z" fill="#7c9eff"/>',
+  good: '<path d="M20 6L9 17l-5-5" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  bad:  '<path d="M18 6L6 18M6 6l12 12" stroke="#f87171" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  warn: '<path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  person: '<circle cx="12" cy="8" r="4" fill="#7c9eff"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="#7c9eff" stroke-width="2" fill="none" stroke-linecap="round"/>',
+};
+
+const el = {
+  headline: document.getElementById('headline'),
+  subline: document.getElementById('subline'),
+  iconCore: document.getElementById('icon-core'),
+  iconPath: document.getElementById('icon-path').parentElement,
+  stage: document.getElementById('stage'),
+  flash: document.getElementById('flash'),
+  connDot: document.getElementById('conn-dot'),
+  connText: document.getElementById('conn-text'),
+  sessionCard: document.getElementById('session-card'),
+  teacherName: document.getElementById('teacher-name'),
+  countdownNum: document.getElementById('countdown-num'),
+  countdownFg: document.getElementById('countdown-fg'),
+  doneBtn: document.getElementById('done-btn'),
+  toastLog: document.getElementById('toast-log'),
+  clock: document.getElementById('clock'),
+};
+
+const RING_CIRC = 132; // 2 * PI * r(21)
+
+let countdownTimer = null;
+let sessionExpiresAt = null;
+let resetHeadlineTimer = null;
+
+function setIcon(kind) {
+  el.iconPath.innerHTML = ICONS[kind] || ICONS.idle;
+  el.iconCore.classList.remove('good', 'bad', 'warn', 'pop');
+  if (kind === 'good') el.iconCore.classList.add('good');
+  if (kind === 'bad') el.iconCore.classList.add('bad');
+  if (kind === 'warn') el.iconCore.classList.add('warn');
+  void el.iconCore.offsetWidth; // reflow เพื่อให้ animation pop เล่นซ้ำได้
+  el.iconCore.classList.add('pop');
+}
+
+function setHeadline(text, sub, tone) {
+  el.headline.textContent = text;
+  el.subline.textContent = sub || '';
+  el.headline.style.color = tone === 'good' ? 'var(--good)'
+    : tone === 'bad' ? 'var(--bad)'
+    : tone === 'warn' ? 'var(--warn)'
+    : 'var(--text-main)';
+}
+
+function flashScreen(tone) {
+  el.flash.className = '';
+  void el.flash.offsetWidth;
+  el.flash.className = tone + ' play';
+}
+
+function shakeStage() {
+  el.stage.classList.remove('shake');
+  void el.stage.offsetWidth;
+  el.stage.classList.add('shake');
+}
+
+function pushToast(text) {
+  const div = document.createElement('div');
+  div.className = 'toast';
+  div.textContent = text;
+  el.toastLog.appendChild(div);
+  setTimeout(() => div.remove(), 4600);
+  // จำกัดจำนวน toast ที่ค้างอยู่พร้อมกัน
+  while (el.toastLog.children.length > 5) {
+    el.toastLog.removeChild(el.toastLog.firstChild);
+  }
+}
+
+function resetToIdle() {
+  setIcon('idle');
+  setHeadline('พร้อมรับการแตะบัตร', 'แตะแท็กประจำตัวครูก่อน แล้วค่อยแตะแท็กกุญแจที่ต้องการยืม/คืน', null);
+}
+
+function scheduleResetHeadline(delayMs) {
+  clearTimeout(resetHeadlineTimer);
+  resetHeadlineTimer = setTimeout(() => {
+    if (sessionActive) {
+      setIcon('person');
+      setHeadline(`สวัสดีคุณครู ${currentTeacherName || ''}`, 'แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย', null);
+    } else {
+      resetToIdle();
+    }
+  }, delayMs);
+}
+
+// ---------------- session / countdown ----------------
+let sessionActive = false;
+let currentTeacherName = '';
+
+function showSessionCard(teacherName, expiresInMs) {
+  sessionActive = true;
+  currentTeacherName = teacherName || '';
+  el.teacherName.textContent = `คุณครู ${currentTeacherName}`;
+  el.sessionCard.classList.add('show');
+  startCountdown(expiresInMs);
+}
+
+function hideSessionCard() {
+  sessionActive = false;
+  el.sessionCard.classList.remove('show');
+  stopCountdown();
+}
+
+function startCountdown(expiresInMs) {
+  stopCountdown();
+  sessionExpiresAt = Date.now() + (expiresInMs || 0);
+
+  countdownTimer = setInterval(() => {
+    const remainMs = sessionExpiresAt - Date.now();
+    const remainSec = Math.max(0, Math.ceil(remainMs / 1000));
+    el.countdownNum.textContent = `เหลือเวลา ${remainSec} วิ`;
+
+    const ratio = Math.max(0, Math.min(1, remainMs / 20000));
+    el.countdownFg.style.strokeDashoffset = RING_CIRC * (1 - ratio);
+
+    if (remainSec <= 5) {
+      el.countdownFg.style.stroke = 'var(--bad)';
+      el.countdownNum.style.color = 'var(--bad)';
+    } else {
+      el.countdownFg.style.stroke = 'var(--accent)';
+      el.countdownNum.style.color = 'var(--text-dim)';
+    }
+
+    if (remainMs <= 0) {
+      stopCountdown();
+    }
+  }, 100);
+}
+
+function stopCountdown() {
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = null;
+}
+
+el.doneBtn.addEventListener('click', () => {
+  fetch('/api/clear-session', { method: 'POST' }).catch(() => {});
+  hideSessionCard();
+  resetToIdle();
+});
+
+// ---------------- SSE ----------------
+function connect() {
+  const src = new EventSource('/events');
+
+  src.addEventListener('connected', () => {
+    el.connDot.classList.add('online');
+    el.connText.textContent = 'เชื่อมต่อพร้อมใช้งาน';
+  });
+
+  src.onopen = () => {
+    el.connDot.classList.add('online');
+    el.connText.textContent = 'เชื่อมต่อพร้อมใช้งาน';
+  };
+
+  src.onerror = () => {
+    el.connDot.classList.remove('online');
+    el.connText.textContent = 'ขาดการเชื่อมต่อ — กำลังลองใหม่...';
+  };
+
+  src.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    handleEvent(msg.type, msg.data);
+  };
+}
+
+function handleEvent(type, data) {
+  if (type === 'tap_sent') {
+    setIcon('idle');
+    setHeadline('กำลังตรวจสอบ...', `แท็ก ${data.tagUid}`, null);
+    return;
+  }
+
+  if (type === 'invalid_value') {
+    setIcon('warn');
+    setHeadline('ค่าที่อ่านได้ไม่ถูกต้อง', 'ตรวจสอบว่าภาษาอินพุตเป็น EN แล้วลองแตะใหม่', 'warn');
+    shakeStage();
+    pushToast(`⚠️ ค่าไม่ตรงรูปแบบ: ${data.raw}`);
+    scheduleResetHeadline(3200);
+    return;
+  }
+
+  if (type === 'lang_warning') {
+    if (data.is_english === false) {
+      pushToast('⚠️ ภาษาอินพุตไม่ใช่ EN — กด Win+Space');
+    }
+    return;
+  }
+
+  if (type === 'session_update') {
+    if (data.active) {
+      showSessionCard(data.teacher ? data.teacher.name : '', data.expiresInMs);
+    } else if (sessionActive) {
+      hideSessionCard();
+      pushToast('เซสชันหมดอายุ');
+      if (!document.hidden) resetToIdle();
+    }
+    return;
+  }
+
+  if (type === 'tap_result') {
+    const ok = data.ok;
+    const state = data.state;
+    const msgText = data.message || '';
+
+    if (ok && state === 'session_started') {
+      setIcon('person');
+      setHeadline(`สวัสดีคุณครู ${data.teacher ? data.teacher.name : ''}`, 'แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย', 'good');
+      flashScreen('good');
+      pushToast(`✅ ${msgText}`);
+    } else if (ok && state === 'borrowed') {
+      setIcon('good');
+      setHeadline('ยืมกุญแจสำเร็จ', msgText, 'good');
+      flashScreen('good');
+      pushToast(`✅ ${msgText}`);
+      scheduleResetHeadline(3200);
+    } else if (ok && state === 'returned') {
+      setIcon('good');
+      setHeadline('คืนกุญแจสำเร็จ', msgText, 'good');
+      flashScreen('good');
+      pushToast(`✅ ${msgText}`);
+      scheduleResetHeadline(3200);
+    } else if (ok && state === 'registered') {
+      setIcon('good');
+      setHeadline('สมัครสำเร็จ', msgText, 'good');
+      flashScreen('good');
+      pushToast(`✅ ${msgText}`);
+      scheduleResetHeadline(3200);
+    } else {
+      // ทุกกรณี error: session_expired, wrong_teacher, unknown_tag,
+      // tag_already_bound, register_failed, ฯลฯ
+      setIcon('bad');
+      const title =
+        state === 'session_expired' ? 'กรุณาแตะแท็กครูก่อน' :
+        state === 'wrong_teacher'   ? 'ทำรายการไม่สำเร็จ' :
+        state === 'unknown_tag'     ? 'ไม่พบแท็กนี้ในระบบ' :
+        'เกิดข้อผิดพลาด';
+      setHeadline(title, msgText, 'bad');
+      flashScreen('bad');
+      shakeStage();
+      pushToast(`❌ ${msgText}`);
+      scheduleResetHeadline(3600);
+    }
+  }
+}
+
+// ---------------- particles ----------------
+function spawnParticles() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 22; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = 3 + Math.random() * 6;
+    p.style.width = size + 'px';
+    p.style.height = size + 'px';
+    p.style.left = Math.random() * 100 + 'vw';
+    p.style.animationDelay = (Math.random() * 14) + 's';
+    p.style.animationDuration = (10 + Math.random() * 10) + 's';
+    container.appendChild(p);
+  }
+}
+
+// ---------------- clock ----------------
+function tickClock() {
+  const now = new Date();
+  el.clock.textContent = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ---------------- init ----------------
+spawnParticles();
+resetToIdle();
+connect();
+</script>
+
+</body>
+</html>

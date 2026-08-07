@@ -1,1 +1,1 @@
-pip install pyserial
+http://localhost:5055

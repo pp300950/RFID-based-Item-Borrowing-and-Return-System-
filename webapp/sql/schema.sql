@@ -65,6 +65,17 @@ create table if not exists room_tags (
   borrowed_by_teacher_id bigint references teachers (id) on delete set null,
   borrowed_at timestamptz,
 
+  -- ช่วงเวลาที่อนุญาตให้ "ยืม" (บังคับจริงที่ /api/tap ไม่ใช่แค่แสดงผล)
+  -- borrow_window_days: อาร์เรย์ของวันในสัปดาห์ที่อนุญาต (0=อาทิตย์ .. 6=เสาร์)
+  --   null = ไม่จำกัดวัน (ยืมได้ทุกวัน)
+  -- borrow_window_start / borrow_window_end: ช่วงเวลาในแต่ละวันที่อนุญาต
+  --   null ทั้งคู่ = ไม่จำกัดเวลา
+  -- การ "คืน" ไม่ถูกจำกัดด้วยฟิลด์เหล่านี้เลย ไม่ว่ากรณีใด (จงใจ — ครูต้อง
+  -- คืนกุญแจได้เสมอ ป้องกันกรณีค้างคืนเพราะติดช่วงเวลาห้ามยืม)
+  borrow_window_days smallint[],
+  borrow_window_start time,
+  borrow_window_end time,
+
   created_at timestamptz not null default now(),
 
   -- status ต้องสอดคล้องกับ borrowed_by_teacher_id/borrowed_at เสมอ
@@ -77,6 +88,23 @@ create table if not exists room_tags (
 
 create index if not exists idx_room_tags_tag_uid on room_tags (tag_uid);
 create index if not exists idx_room_tags_status on room_tags (status);
+
+-- -----------------------------------------------------------------
+-- room_images: หลายรูปต่อห้อง/กุญแจ 1 ดอก (แทนที่ room_tags.image_url
+-- เดี่ยวเดิม) เก็บลำดับการแสดงผลไว้ใน sort_order ให้แอดมินจัดเรียงได้
+-- room_tags.image_url เดิมยังคงอยู่เพื่อ backward compat กับโค้ด/ข้อมูล
+-- เก่าที่ยังอ้างอิงอยู่ (ดู migration note ด้านล่าง)
+-- -----------------------------------------------------------------
+create table if not exists room_images (
+  id bigint generated always as identity primary key,
+  room_tag_id bigint not null references room_tags (id) on delete cascade,
+  image_url text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_room_images_room_tag_id_sort
+  on room_images (room_tag_id, sort_order);
 
 -- -----------------------------------------------------------------
 -- key_logs: ประวัติยืม-คืนทั้งหมด (แทน transactions เดิม แต่ไม่มี
@@ -101,6 +129,7 @@ alter table teachers disable row level security;
 alter table teacher_tags disable row level security;
 alter table room_tags disable row level security;
 alter table key_logs disable row level security;
+alter table room_images disable row level security;
 
 -- -----------------------------------------------------------------
 -- MIGRATION NOTE (ถ้ามี DB เดิมอยู่แล้วจากเวอร์ชันก่อนหน้า):
@@ -164,3 +193,35 @@ create policy "Public read room images"
 -- หมายเหตุ: การ insert/update/delete รูปทำผ่าน service_role key ฝั่ง
 -- backend (supabaseClient.js) เท่านั้น ซึ่ง bypass RLS อยู่แล้ว จึงไม่ต้อง
 -- เพิ่ม policy insert/update/delete ให้ client ฝั่ง browser โดยตรง
+
+
+-- =================================================================
+-- Migration: หลายรูปต่อห้อง + ช่วงเวลาที่อนุญาตยืม
+-- รันใน Supabase SQL editor ครั้งเดียว (รันซ้ำได้ปลอดภัย — ใช้ if not exists)
+-- =================================================================
+
+-- 1) ช่วงเวลาที่อนุญาตยืม บน room_tags (บังคับจริงที่ /api/tap)
+alter table room_tags
+  add column if not exists borrow_window_days smallint[];
+
+alter table room_tags
+  add column if not exists borrow_window_start time;
+
+alter table room_tags
+  add column if not exists borrow_window_end time;
+
+-- 2) ตารางรูปภาพหลายรูปต่อห้อง (room_tags.image_url เดิมยังคงอยู่ ไม่ลบ
+--    ทิ้ง เผื่อโค้ด/หน้าจอเก่าที่ยังอ้างอิง field เดี่ยวนี้อยู่ระหว่าง
+--    ทยอยย้ายไปใช้ room_images แทน)
+create table if not exists room_images (
+  id bigint generated always as identity primary key,
+  room_tag_id bigint not null references room_tags (id) on delete cascade,
+  image_url text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_room_images_room_tag_id_sort
+  on room_images (room_tag_id, sort_order);
+
+alter table room_images disable row level security;
