@@ -83,6 +83,29 @@
               <label for="room-image">รูปภาพห้อง (ไม่บังคับ)</label>
               <input type="file" id="room-image" name="image" accept="image/*" />
             </div>
+
+            <div class="field field--full">
+              <label>ช่วงเวลาที่อนุญาตยืม (ไม่บังคับ — เว้นว่าง = ยืมได้ทุกวันทุกเวลา)</label>
+              <div class="borrow-window-editor" data-borrow-window-editor>
+                <div class="bw-days-row" data-bw-days>
+                  <button type="button" class="bw-day-btn" data-day="1">จ</button>
+                  <button type="button" class="bw-day-btn" data-day="2">อ</button>
+                  <button type="button" class="bw-day-btn" data-day="3">พ</button>
+                  <button type="button" class="bw-day-btn" data-day="4">พฤ</button>
+                  <button type="button" class="bw-day-btn" data-day="5">ศ</button>
+                  <button type="button" class="bw-day-btn" data-day="6">ส</button>
+                  <button type="button" class="bw-day-btn" data-day="0">อา</button>
+                </div>
+                <div class="bw-time-row">
+                  <input type="time" class="bw-time-input" data-bw-start placeholder="เริ่ม" />
+                  <span class="bw-time-sep">ถึง</span>
+                  <input type="time" class="bw-time-input" data-bw-end placeholder="สิ้นสุด" />
+                  <button type="button" class="btn btn--ghost btn--sm" data-bw-clear>ล้างค่า</button>
+                </div>
+                <p class="bw-hint">เลือกวันที่อนุญาตยืม (ไม่เลือกเลย = ทุกวัน) และตั้งช่วงเวลา — รองรับช่วงข้ามเที่ยงคืน เช่น 22:00–06:00</p>
+              </div>
+            </div>
+
             <button type="submit" class="btn btn--admin">เพิ่มห้อง</button>
           </form>
         </div>
@@ -97,12 +120,13 @@
                   <th>ชื่อห้อง</th>
                   <th>เลขแท็ก RFID</th>
                   <th>คำอธิบาย</th>
+                  <th>ช่วงเวลายืม</th>
                   <th>สถานะ</th>
                   <th>จัดการ</th>
                 </tr>
               </thead>
               <tbody id="rooms-tbody">
-                <tr class="row-empty"><td colspan="6">กำลังโหลด...</td></tr>
+                <tr class="row-empty"><td colspan="7">กำลังโหลด...</td></tr>
               </tbody>
             </table>
           </div>
@@ -165,6 +189,15 @@
               <option value="borrow">ยืม</option>
               <option value="return">คืน</option>
             </select>
+
+            <div class="export-row">
+              <label for="history-export-format">ส่งออกเป็น</label>
+              <select id="history-export-format">
+                <option value="csv">CSV</option>
+                <option value="docx">Word (.docx)</option>
+              </select>
+              <button type="button" id="btn-export-history" class="btn btn--ghost btn--sm">ดาวน์โหลด</button>
+            </div>
           </div>
 
           <div class="table-wrap">
@@ -218,6 +251,56 @@
   </div>
 
   <div id="toast" class="admin-toast" role="status" aria-live="polite"></div>
+
+  <!-- ============== Popover แก้ไขช่วงเวลายืม (ตารางห้อง) ==============
+       เปลือกคงที่ ตัวเดียวใช้ร่วมกันทุกแถว — JS ย้ายตำแหน่งไปลอยข้าง
+       ปุ่มที่กด แล้วเติม/ล้างค่าตอนเปิด/ปิดใหม่ทุกครั้ง เหมือน pattern
+       ที่ confirm-dialog ใช้ (สร้างครั้งเดียว เก็บ reference ไว้ใช้ซ้ำ) -->
+  <div id="bw-popover" class="bw-popover">
+    <div class="bw-popover-card">
+      <div class="bw-days-row" data-bw-days>
+        <button type="button" class="bw-day-btn" data-day="1">จ</button>
+        <button type="button" class="bw-day-btn" data-day="2">อ</button>
+        <button type="button" class="bw-day-btn" data-day="3">พ</button>
+        <button type="button" class="bw-day-btn" data-day="4">พฤ</button>
+        <button type="button" class="bw-day-btn" data-day="5">ศ</button>
+        <button type="button" class="bw-day-btn" data-day="6">ส</button>
+        <button type="button" class="bw-day-btn" data-day="0">อา</button>
+      </div>
+      <div class="bw-time-row">
+        <input type="time" class="bw-time-input" data-bw-start />
+        <span class="bw-time-sep">ถึง</span>
+        <input type="time" class="bw-time-input" data-bw-end />
+      </div>
+      <div class="bw-popover-actions">
+        <button type="button" class="btn btn--ghost btn--sm" data-bw-clear>ล้างค่า</button>
+        <button type="button" class="btn btn--ghost btn--sm" data-bw-cancel>ยกเลิก</button>
+        <button type="button" class="btn btn--admin btn--sm" data-bw-save>บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== Modal จัดการรูปหลายรูปต่อห้อง (Task 2b) ==============
+       เปลือกคงที่ตัวเดียว ใช้ pattern เดียวกับ .confirm-overlay (สร้าง
+       ใน admin.css อยู่แล้ว) — เปิด/ปิดด้วย class .is-visible เนื้อหา
+       ในตัว (.images-modal-grid) ถูกเติมด้วย JS ทั้งหมดทุกครั้งที่เปิด
+       เพราะเปลี่ยนไปตามห้องที่เลือก -->
+  <div id="images-modal-overlay" class="images-modal-overlay">
+    <div class="images-modal-card" role="dialog" aria-modal="true" aria-labelledby="images-modal-title">
+      <button type="button" id="images-modal-close" class="confirm-close" aria-label="ปิด">&times;</button>
+      <h3 id="images-modal-title" class="images-modal-title">จัดการรูปภาพ</h3>
+      <p class="images-modal-hint">ลากรูปเพื่อจัดลำดับใหม่ — รูปแรกคือรูปหลักที่แสดงในหน้าครู</p>
+
+      <div id="images-modal-grid" class="images-modal-grid">
+        <!-- เติมด้วย JS: renderManagedImagesGrid() -->
+      </div>
+
+      <label class="images-modal-upload-zone">
+        <span id="images-modal-upload-label">+ เพิ่มรูปภาพ (เลือกได้หลายไฟล์พร้อมกัน)</span>
+        <input type="file" id="images-modal-upload-input" accept="image/*" multiple />
+      </label>
+    </div>
+  </div>
 
 <script src="/js/admin.js"></script>
 </body>

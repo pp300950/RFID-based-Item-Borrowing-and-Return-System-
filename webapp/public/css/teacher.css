@@ -359,6 +359,32 @@
     flex-shrink: 0;
     animation: pulse 1.6s infinite ease-in-out;
   }
+
+  /* --- Task 9c: badge ช่วงเวลาที่ยืมได้ (borrow_window_*) ---
+     สีม่วง (--violet) แยกจากสีเหลือง/อำพัน (--amber) ของ
+     .item-borrowed-duration ตั้งใจ เพราะสื่อความหมายคนละอย่าง:
+     amber = "กำลังถูกยืมอยู่ตอนนี้" (สถานะปัจจุบัน) ส่วน violet =
+     "กติกาว่ายืมได้ช่วงไหนบ้าง" (ข้อจำกัด/นโยบายของห้อง) ไม่ผูกกับ
+     สถานะยืม-คืนปัจจุบันเลย จึงไม่ควรใช้สีเดียวกับ amber ที่คนอาจเข้าใจ
+     ผิดว่าเกี่ยวกับสถานะยืมอยู่ */
+  .item-card-borrow-window {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--violet);
+    background: rgba(139, 127, 209, 0.12);
+    border: 1px solid rgba(139, 127, 209, 0.30);
+    border-radius: 8px;
+    padding: 5px 9px;
+    width: fit-content;
+  }
+
+  .item-card-borrow-window svg {
+    flex-shrink: 0;
+  }
   
   .pill {
     display: inline-block;
@@ -644,6 +670,31 @@
     line-height: 1.5;
   }
 
+  /* --- Task 9c: badge ช่วงเวลาที่ยืมได้ ใน room modal ---
+     ใช้สีม่วงเดียวกับเวอร์ชันการ์ด (.item-card-borrow-window) เพื่อให้
+     ผู้ใช้จำได้ว่าเป็นข้อมูลชนิดเดียวกัน แค่ขนาด/ระยะห่างต่างกันให้
+     เข้ากับ modal ที่มีพื้นที่กว้างกว่าการ์ด — วางไว้ก่อนเข้าไทม์ไลน์
+     ประวัติ ให้เห็นกติกาการยืมก่อนเห็นประวัติการยืมจริง */
+  .room-modal-borrow-window {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--violet);
+    background: rgba(139, 127, 209, 0.10);
+    border: 1px solid rgba(139, 127, 209, 0.28);
+    border-radius: 10px;
+    padding: 9px 12px;
+    margin-bottom: 18px;
+    width: fit-content;
+  }
+
+  .room-modal-borrow-window svg {
+    flex-shrink: 0;
+  }
+
   .room-modal-section-title {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12.5px;
@@ -872,3 +923,87 @@
   
     .items-grid { grid-template-columns: 1fr; }
   }
+
+/* =================================================================
+   history.html — หน้า "ดูทั้งหมด" ของประวัติยืม-คืน
+   -----------------------------------------------------------------
+   ใช้ .room-modal-timeline-row (มีอยู่แล้วด้านบน) เป็นฐานของแต่ละแถว
+   ตรงๆ เพื่อให้หน้าตาเหมือนกับ timeline ใน room modal ทุกจุด — เพิ่ม
+   แค่ .history-row (ปรับ gap ให้กว้างขึ้นเพราะหน้านี้มีพื้นที่กว้าง
+   กว่าใน modal) และ .history-row-room (ชื่อห้อง แสดงเฉพาะตอนดูรวม
+   ทุกห้อง — ดู history.js: roomLabel)
+   ================================================================= */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-row {
+  gap: 14px;
+}
+
+.history-row-room {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--violet);
+  flex-shrink: 0;
+  min-width: 90px;
+}
+
+/* --- Pagination --- */
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.history-page-btn {
+  border: 1px solid var(--ink-line);
+  background: transparent;
+  color: var(--text-mid);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.history-page-btn:hover:not(:disabled) {
+  border-color: var(--violet);
+  color: var(--violet);
+}
+
+.history-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.history-page-info {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12.5px;
+  color: var(--text-low);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .history-row {
+    gap: 8px;
+  }
+  .history-row-room {
+    min-width: 0;
+    flex-basis: 100%;
+    order: -1;
+  }
+  .history-pagination {
+    gap: 10px;
+  }
+  .history-page-info {
+    font-size: 11.5px;
+  }
+}

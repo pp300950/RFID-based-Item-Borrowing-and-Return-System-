@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ประวัติยืม-คืน — ระบบยืม-คืนกุญแจ RFID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="/css/teacher.css" />
+</head>
+<body>
+
+  <div class="teacher-shell">
+
+    <header class="teacher-topbar">
+      <div>
+        <div class="teacher-brand-eyebrow">ACCESS PASS · ประวัติยืม-คืน</div>
+        <h1 class="teacher-brand-title" id="history-page-title">ประวัติยืม-คืนทั้งหมด</h1>
+      </div>
+
+      <a href="/teacher.html" class="logout-btn">&larr; กลับไปดูสถานะกุญแจ</a>
+    </header>
+
+    <main class="teacher-main">
+
+      <!-- ============== ประวัติยืม-คืน (paginated) ==============
+           หน้านี้เข้าได้ 2 ทาง:
+             1. /history.html            -> ประวัติทุกห้องรวมกัน
+             2. /history.html?roomId=X   -> เฉพาะห้องนั้น (ลิงก์มาจาก
+                ปุ่ม "ดูทั้งหมด" ใน room modal ของ teacher.js เมื่อ
+                ประวัติในห้องมีเกิน 10 รายการ)
+           JS อ่าน roomId จาก query string เอง แล้วปรับหัวข้อ/คำอธิบาย
+           ให้ตรงกับบริบท ไม่ต้อง render 2 เวอร์ชันแยกกันในไฟล์นี้ -->
+      <section>
+        <h2 class="teacher-section-title" id="history-section-title">ประวัติยืม-คืนล่าสุด</h2>
+        <p class="teacher-section-sub" id="history-section-sub">
+          รายการยืม-คืนทั้งหมด เรียงล่าสุดก่อน — หน้านี้เป็นหน้าสาธารณะ ไม่ต้องเข้าสู่ระบบ
+        </p>
+
+        <div id="history-list" class="history-list">
+          <div class="room-modal-timeline-loading">กำลังโหลด...</div>
+        </div>
+
+        <!-- ============== Pagination ==============
+             ปุ่มก่อนหน้า/ถัดไป + เลขหน้าปัจจุบัน/ทั้งหมด — เรียบง่ายพอ
+             สำหรับ public endpoint ที่ไม่มี filter ซับซ้อน (ต่างจาก
+             หน้าแอดมินซึ่งมี filter action ด้วย) ปุ่มถูก disable เองเมื่อ
+             อยู่หน้าแรก/หน้าสุดท้ายแล้ว ไม่ต้องซ่อนทั้งแถบ -->
+        <div id="history-pagination" class="history-pagination">
+          <button type="button" id="history-prev-page" class="history-page-btn" disabled>&larr; ก่อนหน้า</button>
+          <span id="history-page-info" class="history-page-info">หน้า 1 / 1</span>
+          <button type="button" id="history-next-page" class="history-page-btn" disabled>ถัดไป &rarr;</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="teacher-toast" role="status" aria-live="polite"></div>
+
+<script src="/js/history.js"></script>
+</body>
+</html>

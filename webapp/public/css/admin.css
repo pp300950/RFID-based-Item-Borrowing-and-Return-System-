@@ -278,6 +278,7 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
 .filter-row label {
@@ -296,6 +297,36 @@
   color: var(--text-hi);
   font-family: 'IBM Plex Sans Thai', sans-serif;
   outline: none;
+}
+
+/* --- Export row (history section) — ชิดขวาสุดของ filter-row --- */
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.export-row label {
+  font-size: 12.5px;
+  color: var(--text-mid);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.export-row select {
+  background: var(--panel);
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-hi);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  outline: none;
+}
+
+.btn--sm[disabled] {
+  opacity: 0.6;
 }
 
 /* --- Tables --- */
@@ -409,6 +440,23 @@ table.admin-table {
   display: none;
 }
 
+.room-thumb-manage-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-low);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+}
+
+.room-thumb-manage-btn:hover {
+  color: var(--violet);
+  text-decoration: underline;
+}
+
 /* --- Inline-editable table cells --- */
 .edit-inline {
   width: 100%;
@@ -488,6 +536,336 @@ select.edit-inline:disabled {
   color: var(--text-low);
   margin-top: 4px;
   min-height: 16px;
+}
+
+/* --- Borrow window: field เต็มแถวในฟอร์มเพิ่มห้อง --- */
+.create-form .field--full {
+  flex-basis: 100%;
+}
+
+.borrow-window-editor {
+  background: var(--panel);
+  border: 1px solid var(--ink-line);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.bw-days-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.bw-day-btn {
+  min-width: 36px;
+  padding: 7px 8px;
+  border: 1px solid var(--ink-line);
+  background: var(--panel-2);
+  color: var(--text-mid);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.bw-day-btn:hover {
+  border-color: var(--amber);
+}
+
+.bw-day-btn.is-selected {
+  background: rgba(232, 163, 61, 0.20);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.bw-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bw-time-input {
+  background: var(--panel-2);
+  border: 1px solid var(--ink-line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-hi);
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+}
+
+.bw-time-input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
+}
+
+.bw-time-sep {
+  font-size: 12.5px;
+  color: var(--text-low);
+}
+
+.bw-hint {
+  font-size: 11px;
+  color: var(--text-low);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+/* --- Borrow window: ตัวสรุปในตารางห้อง (ปุ่มเปิด popover) --- */
+.bw-summary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  background: transparent;
+  border: 1px dashed var(--ink-line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--text-mid);
+  font-family: 'IBM Plex Sans Thai', sans-serif;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.bw-summary-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.bw-summary-btn.has-window {
+  border-style: solid;
+  color: var(--amber);
+  border-color: rgba(232, 163, 61, 0.4);
+}
+
+/* --- Borrow window: popover ลอยข้างปุ่มในตาราง --- */
+.bw-popover {
+  position: fixed;
+  z-index: 150;
+  display: none;
+}
+
+.bw-popover.is-visible {
+  display: block;
+}
+
+.bw-popover-card {
+  background: var(--panel-2);
+  border: 1px solid var(--ink-line);
+  border-radius: 12px;
+  padding: 14px;
+  width: 300px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+
+.bw-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.bw-popover-actions .btn--ghost[data-bw-clear] {
+  margin-right: auto;
+}
+
+/* =================================================================
+   Modal จัดการรูปหลายรูปต่อห้อง (Task 2b)
+   -----------------------------------------------------------------
+   โครง overlay/card ใช้ pattern เดียวกับ .confirm-overlay/.confirm-card
+   ทุกจุด (fixed inset, backdrop blur, is-visible toggle) แค่ขยายขนาด
+   การ์ดให้กว้างพอสำหรับกริดรูปภาพ — ไม่ reuse class เดิมตรงๆ เพราะ
+   ต้องการ max-width ต่างกัน (confirm การ์ดแคบเหมาะกับข้อความยืนยัน
+   สั้นๆ ไม่เหมาะกับกริดรูป)
+   ================================================================= */
+.images-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 24, 0.62);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 200;
+}
+
+.images-modal-overlay.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.images-modal-card {
+  position: relative;
+  background: var(--panel-2);
+  border: 1px solid var(--ink-line);
+  border-radius: 16px;
+  padding: 28px 26px 24px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  transform: translateY(6px) scale(0.98);
+  transition: transform 0.15s ease;
+}
+
+.images-modal-overlay.is-visible .images-modal-card {
+  transform: translateY(0) scale(1);
+}
+
+.images-modal-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-hi);
+  margin: 0 28px 4px 0;
+}
+
+.images-modal-hint {
+  font-size: 12px;
+  color: var(--text-low);
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+
+.images-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.images-modal-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-low);
+  font-size: 12.5px;
+  padding: 24px 10px;
+  border: 1px dashed var(--ink-line);
+  border-radius: 10px;
+}
+
+/* --- Tile รูปแต่ละใบ --- */
+.images-modal-tile {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--ink-line);
+  background: var(--panel);
+  cursor: grab;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.images-modal-tile:active {
+  cursor: grabbing;
+}
+
+.images-modal-tile.is-dragging {
+  opacity: 0.4;
+}
+
+.images-modal-tile.is-drop-target {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.35);
+}
+
+.images-modal-tile-img {
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+  display: block;
+  pointer-events: none; /* กัน browser เริ่ม drag รูปแบบ native ซ้อนกับ drag ของ tile เอง */
+}
+
+.images-modal-tile-order {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(15, 20, 24, 0.72);
+  color: var(--text-hi);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.images-modal-tile-order.is-primary {
+  background: var(--amber);
+  color: #0F1418;
+}
+
+.images-modal-tile-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 20, 24, 0.72);
+  color: var(--text-hi);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.images-modal-tile-delete:hover {
+  background: #E0645A;
+  color: #fff;
+}
+
+.images-modal-tile-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Upload dropzone --- */
+.images-modal-upload-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--ink-line);
+  border-radius: 10px;
+  padding: 16px;
+  color: var(--text-mid);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.images-modal-upload-zone:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(232, 163, 61, 0.06);
+}
+
+.images-modal-upload-zone input[type="file"] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .images-modal-card {
+    padding: 22px 18px 20px;
+  }
+  .images-modal-grid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
 }
 
 /* --- Toast --- */

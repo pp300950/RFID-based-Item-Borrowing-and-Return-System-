@@ -263,17 +263,108 @@ function formatDateTime(iso) {
 
 
 // =================================================================
+// Borrow window — helper ที่ใช้ร่วมกันทั้งฟอร์มเพิ่มห้อง (create-form
+// ในหน้า) และ popover แก้ไขในตาราง (SECTION 01) เพราะ 2 ที่นี้มี markup
+// เหมือนกันทุกจุด (.bw-days-row/.bw-day-btn/data-bw-start/data-bw-end)
+// ต่างกันแค่ container — ฟังก์ชันด้านล่างรับ root element เข้ามาแทน
+// การ query แบบ hardcode id เดียว
+// =================================================================
+
+const DAY_LABELS_TH = { 0: "อา", 1: "จ", 2: "อ", 3: "พ", 4: "พฤ", 5: "ศ", 6: "ส" };
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // จ-อา ให้อ่านง่ายแบบปฏิทินไทยทั่วไป
+
+// ผูก click ให้ปุ่มวัน toggle .is-selected ภายใน root ที่กำหนด (เรียกครั้งเดียวตอน setup)
+function bindDayToggle(root) {
+  const daysRow = root.querySelector("[data-bw-days]");
+  daysRow.addEventListener("click", (e) => {
+    const btn = e.target.closest(".bw-day-btn");
+    if (!btn) return;
+    btn.classList.toggle("is-selected");
+  });
+}
+
+// เซ็ตค่าเริ่มต้นของ editor จาก room ที่มีอยู่ (หรือเคลียร์ถ้าไม่ส่ง room มา)
+function setBorrowWindowEditorValue(root, room) {
+  const days = room && Array.isArray(room.borrow_window_days) ? room.borrow_window_days : null;
+  root.querySelectorAll(".bw-day-btn").forEach((btn) => {
+    const d = parseInt(btn.dataset.day, 10);
+    btn.classList.toggle("is-selected", !!(days && days.includes(d)));
+  });
+  root.querySelector("[data-bw-start]").value = (room && room.borrow_window_start) ? room.borrow_window_start.slice(0, 5) : "";
+  root.querySelector("[data-bw-end]").value = (room && room.borrow_window_end) ? room.borrow_window_end.slice(0, 5) : "";
+}
+
+// อ่านค่าปัจจุบันจาก editor -> payload สำหรับ apiPost/apiPatch
+// คืนค่า { ok, message } หรือ { ok: true, payload }
+function readBorrowWindowEditorValue(root) {
+  const selectedDays = Array.from(root.querySelectorAll(".bw-day-btn.is-selected")).map((btn) =>
+    parseInt(btn.dataset.day, 10)
+  );
+  const startVal = root.querySelector("[data-bw-start]").value; // "" หรือ "HH:MM"
+  const endVal = root.querySelector("[data-bw-end]").value;
+
+  if ((startVal && !endVal) || (!startVal && endVal)) {
+    return { ok: false, message: "กรุณากรอกเวลาเริ่มและสิ้นสุดให้ครบทั้งคู่ (หรือเว้นว่างทั้งคู่)" };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      borrowWindowDays: selectedDays.length > 0 ? selectedDays : null,
+      borrowWindowStart: startVal || null,
+      borrowWindowEnd: endVal || null,
+    },
+  };
+}
+
+// สรุปช่วงเวลาเป็นข้อความไทยอ่านง่าย เช่น "ยืมได้: จ-ศ 08:00-16:00"
+// ใช้ทั้งในตัวปุ่มสรุปของตาราง — ไม่จำเป็นต้อง contiguous run กัน
+// (ถ้าเลือกวันไม่ติดกัน เช่น จ,พ,ศ ก็แค่ไล่คั่นด้วยจุลภาค ไม่พยายามหา
+// ช่วงต่อเนื่องแบบ "จ-ศ" ให้ซับซ้อนเกินจำเป็นสำหรับ use case นี้)
+function formatBorrowWindowSummary(room) {
+  const days = Array.isArray(room.borrow_window_days) ? room.borrow_window_days : null;
+  const start = room.borrow_window_start ? room.borrow_window_start.slice(0, 5) : null;
+  const end = room.borrow_window_end ? room.borrow_window_end.slice(0, 5) : null;
+
+  if (!days && !start && !end) {
+    return { text: "ยืมได้ทุกวันทุกเวลา", hasWindow: false };
+  }
+
+  const daysLabel = days
+    ? DAY_ORDER.filter((d) => days.includes(d)).map((d) => DAY_LABELS_TH[d]).join(",")
+    : "ทุกวัน";
+  const timeLabel = start && end ? `${start}-${end}` : "ทุกเวลา";
+
+  return { text: `${daysLabel} ${timeLabel}`, hasWindow: true };
+}
+
+// =================================================================
 // SECTION 01 — ห้อง / กุญแจ
 // =================================================================
 
 const roomsTbody = document.getElementById("rooms-tbody");
 const formRoomCreate = document.getElementById("form-room-create");
+const createFormBwEditor = formRoomCreate.querySelector("[data-borrow-window-editor]");
+bindDayToggle(createFormBwEditor);
+
+createFormBwEditor.querySelector("[data-bw-clear]").addEventListener("click", () => {
+  setBorrowWindowEditorValue(createFormBwEditor, null);
+});
 
 async function loadRooms() {
+  // renderRoomsTable() แทนที่ innerHTML ทั้งตาราง ปุ่มที่ popover ผูก
+  // ตำแหน่งไว้ (bwPopoverTriggerBtn) จะหลุดจาก DOM ทันที — ปิด popover
+  // ก่อนเสมอกันมันค้างลอยอยู่โดยไม่มีปุ่มอ้างอิงจริงแล้ว (ฟังก์ชัน/
+  // ตัวแปรนี้ประกาศอยู่ท้ายไฟล์ แต่ loadRooms() ถูกเรียกจริงหลัง script
+  // ทั้งไฟล์รันจบแล้วเท่านั้น — ปลอดภัยจาก temporal dead zone)
+  if (bwPopoverRoomId !== null) {
+    closeBwPopover();
+  }
+
   const { ok, data } = await apiGet("/api/admin/rooms");
 
   if (!ok) {
-    roomsTbody.innerHTML = `<tr class="row-empty"><td colspan="5">${escapeHtml(data.message || "โหลดข้อมูลไม่สำเร็จ")}</td></tr>`;
+    roomsTbody.innerHTML = `<tr class="row-empty"><td colspan="7">${escapeHtml(data.message || "โหลดข้อมูลไม่สำเร็จ")}</td></tr>`;
     return;
   }
 
@@ -281,9 +372,20 @@ async function loadRooms() {
   renderRoomsTable();
 }
 
+// ปุ่มสรุปช่วงเวลายืมในตาราง — ตัวปุ่มเองเก็บ data-id ไว้ให้ event
+// delegation ที่ roomsTbody หาแถว/ห้องที่ตรงกันได้ตอนคลิกเปิด popover
+function renderBorrowWindowCell(room) {
+  const { text, hasWindow } = formatBorrowWindowSummary(room);
+  return `
+    <button type="button" class="bw-summary-btn ${hasWindow ? "has-window" : ""}" data-action="edit-borrow-window" data-id="${room.id}">
+      ${escapeHtml(text)}
+    </button>
+  `;
+}
+
 function renderRoomsTable() {
   if (state.rooms.length === 0) {
-    roomsTbody.innerHTML = `<tr class="row-empty"><td colspan="6">ยังไม่มีห้อง/กุญแจในระบบ — เพิ่มรายการแรกด้านบน</td></tr>`;
+    roomsTbody.innerHTML = `<tr class="row-empty"><td colspan="7">ยังไม่มีห้อง/กุญแจในระบบ — เพิ่มรายการแรกด้านบน</td></tr>`;
     return;
   }
 
@@ -303,6 +405,9 @@ function renderRoomsTable() {
                 ${room.image_url ? "เปลี่ยนรูป" : "เพิ่มรูป"}
                 <input type="file" class="room-thumb-upload-input" data-action="upload-room-image" data-id="${room.id}" accept="image/*" />
               </label>
+              <button type="button" class="room-thumb-manage-btn" data-action="manage-room-images" data-id="${room.id}" data-name="${escapeHtml(room.room_name)}">
+                จัดการรูป (หลายรูป)
+              </button>
             </div>
           </td>
           <td>
@@ -313,6 +418,9 @@ function renderRoomsTable() {
           </td>
           <td>
             <input class="edit-inline" data-field="description" value="${escapeHtml(room.description || "")}" placeholder="—" />
+          </td>
+          <td>
+            ${renderBorrowWindowCell(room)}
           </td>
           <td>
             <span class="pill ${isActive ? "pill--active" : "pill--inactive"}">${isActive ? "ใช้งานอยู่" : "ปิดใช้งาน"}</span>
@@ -340,7 +448,19 @@ formRoomCreate.addEventListener("submit", async (e) => {
   const imageInput = document.getElementById("room-image");
   const imageFile = imageInput.files && imageInput.files[0] ? imageInput.files[0] : null;
 
-  const { ok, data } = await apiPost("/api/admin/rooms", { roomName, tagUid, description });
+  const bwResult = readBorrowWindowEditorValue(createFormBwEditor);
+  if (!bwResult.ok) {
+    showToast(bwResult.message, "error");
+    submitBtn.disabled = false;
+    return;
+  }
+
+  const { ok, data } = await apiPost("/api/admin/rooms", {
+    roomName,
+    tagUid,
+    description,
+    ...bwResult.payload,
+  });
 
   if (ok) {
     // ถ้ามีเลือกไฟล์รูปมาด้วย อัปโหลดต่อทันทีให้ห้องที่เพิ่งสร้าง
@@ -357,6 +477,7 @@ formRoomCreate.addEventListener("submit", async (e) => {
       showToast("เพิ่มห้อง/กุญแจสำเร็จ", "ok");
     }
     formRoomCreate.reset();
+    setBorrowWindowEditorValue(createFormBwEditor, null);
     await loadRooms();
   } else {
     showToast(data.message || "เพิ่มห้องไม่สำเร็จ", "error");
@@ -428,11 +549,109 @@ roomsTbody.addEventListener("change", async (e) => {
   }
 });
 
+// -------------------------------------------------------------
+// Popover แก้ไขช่วงเวลายืม — เปลือกเดียวใน DOM (#bw-popover) ใช้ซ้ำทุก
+// แถว ย้ายตำแหน่งไปลอยใต้ปุ่มที่กดทุกครั้งที่เปิด เหมือน pattern ของ
+// confirm-dialog (สร้าง/bind event ครั้งเดียว, เก็บ "ห้องที่กำลังแก้อยู่"
+// ไว้ในตัวแปรปิด (closure) ระดับโมดูลแทนที่จะสร้าง element ใหม่ทุกครั้ง)
+// -------------------------------------------------------------
+const bwPopoverEl = document.getElementById("bw-popover");
+bindDayToggle(bwPopoverEl);
+
+let bwPopoverRoomId = null;
+let bwPopoverTriggerBtn = null;
+
+function closeBwPopover() {
+  bwPopoverEl.classList.remove("is-visible");
+  document.removeEventListener("mousedown", onBwPopoverOutsideClick, true);
+  document.removeEventListener("keydown", onBwPopoverKeydown);
+  bwPopoverRoomId = null;
+  bwPopoverTriggerBtn = null;
+}
+
+function onBwPopoverOutsideClick(e) {
+  if (bwPopoverEl.contains(e.target)) return;
+  closeBwPopover();
+}
+
+function onBwPopoverKeydown(e) {
+  if (e.key === "Escape") closeBwPopover();
+}
+
+function openBwPopover(triggerBtn, room) {
+  bwPopoverRoomId = room.id;
+  bwPopoverTriggerBtn = triggerBtn;
+
+  setBorrowWindowEditorValue(bwPopoverEl, room);
+
+  // จัดตำแหน่งลอยใต้ปุ่มที่กด (fixed positioning เทียบกับ viewport
+  // เพราะ #bw-popover ประกาศ position:fixed ใน CSS — ใช้ค่าจาก
+  // getBoundingClientRect ตรงๆ ได้เลย ไม่ต้องบวก scrollX/Y เอง)
+  const rect = triggerBtn.getBoundingClientRect();
+  bwPopoverEl.style.top = `${rect.bottom + 8}px`;
+  bwPopoverEl.style.left = `${Math.min(rect.left, window.innerWidth - 320)}px`;
+
+  bwPopoverEl.classList.add("is-visible");
+
+  // ใช้ capture phase + setTimeout กันคลิกที่เปิด popover ตัวมันเอง
+  // ไปโดน outside-click handler ทันทีในรอบเดียวกัน (event bubbling
+  // เดียวกับที่ทำให้เปิดปิดสลับกันไปมาถ้าไม่กันจุดนี้)
+  setTimeout(() => {
+    document.addEventListener("mousedown", onBwPopoverOutsideClick, true);
+    document.addEventListener("keydown", onBwPopoverKeydown);
+  }, 0);
+}
+
+bwPopoverEl.querySelector("[data-bw-clear]").addEventListener("click", () => {
+  setBorrowWindowEditorValue(bwPopoverEl, null);
+});
+
+bwPopoverEl.querySelector("[data-bw-cancel]").addEventListener("click", () => {
+  closeBwPopover();
+});
+
+bwPopoverEl.querySelector("[data-bw-save]").addEventListener("click", async () => {
+  const roomId = bwPopoverRoomId;
+  if (!roomId) return;
+
+  const bwResult = readBorrowWindowEditorValue(bwPopoverEl);
+  if (!bwResult.ok) {
+    showToast(bwResult.message, "error");
+    return;
+  }
+
+  const saveBtn = bwPopoverEl.querySelector("[data-bw-save]");
+  saveBtn.disabled = true;
+
+  const { ok, data } = await apiPatch(`/api/admin/rooms/${roomId}`, bwResult.payload);
+
+  saveBtn.disabled = false;
+
+  if (ok) {
+    showToast("บันทึกช่วงเวลายืมแล้ว", "ok");
+    closeBwPopover();
+    await loadRooms();
+  } else {
+    showToast(data.message || "บันทึกไม่สำเร็จ", "error");
+  }
+});
+
 roomsTbody.addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-action]");
   if (!btn) return;
 
   const id = btn.dataset.id;
+
+  if (btn.dataset.action === "edit-borrow-window") {
+    const room = state.rooms.find((r) => String(r.id) === String(id));
+    if (!room) return;
+    if (bwPopoverRoomId === room.id) {
+      closeBwPopover();
+    } else {
+      openBwPopover(btn, room);
+    }
+    return;
+  }
 
   if (btn.dataset.action === "toggle-room-active") {
     const currentlyActive = btn.dataset.active === "true";
@@ -464,6 +683,253 @@ roomsTbody.addEventListener("click", async (e) => {
       btn.disabled = false;
     }
   }
+});
+
+// =================================================================
+// Modal จัดการรูปหลายรูปต่อห้อง (Task 2b)
+// -----------------------------------------------------------------
+// เปิดจากปุ่ม "จัดการรูป (หลายรูป)" ในตาราง SECTION 01 — ใช้ endpoint
+// ต่อไปนี้:
+//   - อ่านรายการรูปปัจจุบัน: GET /api/keys/status (public, ไม่ต้อง
+//     auth) ซึ่ง embed room_images(id, image_url, sort_order) มาด้วย
+//     อยู่แล้ว — ไม่มี endpoint แอดมินโดยเฉพาะสำหรับ "ดึงรูปของห้อง
+//     เดียว" (มีแต่ POST เพิ่ม/DELETE ลบ/PATCH reorder ไม่มี GET)
+//     จึงยืมมาใช้จุดนี้แทนที่จะเพิ่ม backend endpoint ใหม่
+//     ข้อจำกัดที่ตามมา: endpoint นี้ filter is_active=true เท่านั้น
+//     (ดู routes/keys.js) — ถ้าห้องถูกปิดใช้งานอยู่ (is_active=false)
+//     จะไม่มีใน response นี้เลย โมดอลจะโชว์ข้อความแจ้งเตือนแทนกริดว่าง
+//     เปล่าที่ไม่มีคำอธิบาย (ดู loadManagedImages ด้านล่าง)
+//   - เพิ่มรูป: POST /api/admin/rooms/:id/images (field "images", ได้
+//     หลายไฟล์พร้อมกัน สูงสุด 10 ไฟล์/ครั้ง)
+//   - ลบรูป: DELETE /api/admin/rooms/:id/images/:imageId
+//   - จัดลำดับใหม่: PATCH /api/admin/rooms/:id/images/reorder
+//     body { order: [imageId, ...] } ต้องส่งครบทุกรูปของห้องนั้น
+//
+// Drag-to-reorder ใช้ HTML5 native drag-and-drop (draggable="true" +
+// dragstart/dragover/drop) ไม่พึ่ง library ภายนอก — state ระหว่างลาก
+// เก็บแค่ index ที่กำลังลากอยู่ใน closure ตัวแปรเดียว (ไม่ต้องซับซ้อน
+// กว่านี้ เพราะกริดรูปมีจำนวนน้อย ไม่ใช่ list ยาวเป็นร้อยรายการ)
+// -------------------------------------------------------------
+const imagesModalOverlay = document.getElementById("images-modal-overlay");
+const imagesModalGrid = document.getElementById("images-modal-grid");
+const imagesModalTitle = document.getElementById("images-modal-title");
+const imagesModalClose = document.getElementById("images-modal-close");
+const imagesModalUploadInput = document.getElementById("images-modal-upload-input");
+const imagesModalUploadLabel = document.getElementById("images-modal-upload-label");
+
+let managedRoomId = null;
+let managedRoomName = "";
+let managedImages = []; // [{ id, image_url, sort_order }, ...] เรียงตาม sort_order เสมอ
+let dragFromIndex = null;
+
+function openImagesModal(roomId, roomName) {
+  managedRoomId = roomId;
+  managedRoomName = roomName;
+  imagesModalTitle.textContent = `จัดการรูปภาพ — ${roomName}`;
+  imagesModalGrid.innerHTML = `<div class="images-modal-empty">กำลังโหลด...</div>`;
+  imagesModalOverlay.classList.add("is-visible");
+  document.addEventListener("keydown", onImagesModalKeydown);
+  loadManagedImages();
+}
+
+function closeImagesModal() {
+  imagesModalOverlay.classList.remove("is-visible");
+  document.removeEventListener("keydown", onImagesModalKeydown);
+  managedRoomId = null;
+  managedImages = [];
+}
+
+function onImagesModalKeydown(e) {
+  if (e.key === "Escape") closeImagesModal();
+}
+
+imagesModalClose.addEventListener("click", closeImagesModal);
+imagesModalOverlay.addEventListener("click", (e) => {
+  if (e.target === imagesModalOverlay) closeImagesModal();
+});
+
+// ดึงรายการรูปปัจจุบันของห้องที่กำลังจัดการอยู่ จาก public endpoint
+// (ดูหมายเหตุยาวด้านบนหัว section นี้ — ไม่มี endpoint แอดมินโดยเฉพาะ)
+async function loadManagedImages() {
+  try {
+    const res = await fetch("/api/keys/status");
+    const data = await res.json();
+
+    if (!res.ok || !data.ok) {
+      imagesModalGrid.innerHTML = `<div class="images-modal-empty">โหลดรายการรูปไม่สำเร็จ — ลองปิดแล้วเปิดใหม่</div>`;
+      return;
+    }
+
+    const matched = (data.keys || []).find((k) => String(k.id) === String(managedRoomId));
+
+    if (!matched) {
+      // ห้องนี้ไม่อยู่ใน response — สาเหตุที่เป็นไปได้มากสุดคือห้องถูก
+      // ปิดใช้งานอยู่ (/api/keys/status กรอง is_active=true เท่านั้น)
+      // ไม่ใช่ว่าห้องไม่มีอยู่จริง (เพิ่งเห็นในตารางเมื่อกี้ก่อนกดปุ่ม)
+      const room = state.rooms.find((r) => String(r.id) === String(managedRoomId));
+      const isInactive = room && room.is_active === false;
+      imagesModalGrid.innerHTML = `<div class="images-modal-empty">${
+        isInactive
+          ? "ห้องนี้ถูกปิดใช้งานอยู่ — เปิดใช้งานห้องก่อนเพื่อดู/จัดการรูปภาพ"
+          : "ไม่พบข้อมูลรูปภาพของห้องนี้"
+      }</div>`;
+      managedImages = [];
+      return;
+    }
+
+    managedImages = (matched.room_images || []).slice().sort((a, b) => a.sort_order - b.sort_order);
+    renderManagedImagesGrid();
+  } catch (err) {
+    imagesModalGrid.innerHTML = `<div class="images-modal-empty">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง</div>`;
+  }
+}
+
+function renderManagedImagesGrid() {
+  if (managedImages.length === 0) {
+    imagesModalGrid.innerHTML = `<div class="images-modal-empty">ห้องนี้ยังไม่มีรูปภาพ — เพิ่มรูปด้านล่าง</div>`;
+    return;
+  }
+
+  imagesModalGrid.innerHTML = managedImages
+    .map(
+      (img, index) => `
+        <div class="images-modal-tile" draggable="true" data-index="${index}" data-image-id="${img.id}">
+          <img class="images-modal-tile-img" src="${escapeHtml(img.image_url)}" alt="รูปที่ ${index + 1}" />
+          <span class="images-modal-tile-order ${index === 0 ? "is-primary" : ""}">${
+        index === 0 ? "หลัก" : index + 1
+      }</span>
+          <button type="button" class="images-modal-tile-delete" data-action="delete-room-image" data-image-id="${img.id}" aria-label="ลบรูปนี้">&times;</button>
+        </div>
+      `
+    )
+    .join("");
+}
+
+// -------------------------------------------------------------
+// เพิ่มรูป — เลือกไฟล์แล้วอัปโหลดทันที (multi-file input)
+// -------------------------------------------------------------
+imagesModalUploadInput.addEventListener("change", async () => {
+  const files = imagesModalUploadInput.files;
+  if (!files || files.length === 0) return;
+
+  if (!managedRoomId) return;
+
+  const originalLabel = imagesModalUploadLabel.textContent;
+  imagesModalUploadLabel.textContent = "กำลังอัปโหลด...";
+
+  const fd = new FormData();
+  Array.from(files).forEach((file) => fd.append("images", file));
+
+  const { ok, data } = await apiUpload(`/api/admin/rooms/${managedRoomId}/images`, fd);
+
+  imagesModalUploadLabel.textContent = originalLabel;
+  imagesModalUploadInput.value = ""; // เคลียร์ input กันเลือกไฟล์ชุดเดิมซ้ำแล้วไม่ trigger change
+
+  if (ok) {
+    showToast(`เพิ่มรูปภาพสำเร็จ (${data.images ? data.images.length : files.length} ไฟล์)`, "ok");
+    await loadManagedImages();
+    await loadRooms(); // อัปเดต thumbnail หลักในตารางด้วย เผื่อห้องนี้ยังไม่เคยมีรูปมาก่อน
+  } else {
+    showToast(data.message || "อัปโหลดรูปไม่สำเร็จ", "error");
+  }
+});
+
+// -------------------------------------------------------------
+// ลบรูป — event delegation บนกริด (tile ถูก re-render ทุกครั้ง)
+// -------------------------------------------------------------
+imagesModalGrid.addEventListener("click", async (e) => {
+  const btn = e.target.closest('button[data-action="delete-room-image"]');
+  if (!btn) return;
+
+  const imageId = btn.dataset.imageId;
+  if (!managedRoomId || !imageId) return;
+
+  btn.disabled = true;
+
+  const { ok, data } = await apiDelete(`/api/admin/rooms/${managedRoomId}/images/${imageId}`);
+
+  if (ok) {
+    showToast("ลบรูปภาพแล้ว", "ok");
+    await loadManagedImages();
+    await loadRooms();
+  } else {
+    showToast(data.message || "ลบรูปไม่สำเร็จ", "error");
+    btn.disabled = false;
+  }
+});
+
+// -------------------------------------------------------------
+// Drag-to-reorder — native HTML5 DnD บน tile แต่ละใบ
+// dragstart: จำ index ที่เริ่มลาก
+// dragover: ต้อง preventDefault เสมอ (ไม่งั้น drop event จะไม่ยิง) +
+//   ใส่ class บอกตำแหน่งที่จะวาง (visual feedback)
+// drop: สลับตำแหน่งใน managedImages array ตาม index ต้นทาง/ปลายทาง
+//   แล้ว render ใหม่ทันที (optimistic) ก่อนค่อยยิง PATCH reorder จริง
+//   ไปเก็บที่ server — ถ้า PATCH ล้มเหลว โหลดข้อมูลจริงจาก server
+//   กลับมาทับ (ไม่ manual revert เอง กันเคส state เพี้ยนไปมากกว่าเดิม)
+// -------------------------------------------------------------
+imagesModalGrid.addEventListener("dragstart", (e) => {
+  const tile = e.target.closest(".images-modal-tile");
+  if (!tile) return;
+  dragFromIndex = parseInt(tile.dataset.index, 10);
+  tile.classList.add("is-dragging");
+  e.dataTransfer.effectAllowed = "move";
+});
+
+imagesModalGrid.addEventListener("dragend", (e) => {
+  const tile = e.target.closest(".images-modal-tile");
+  if (tile) tile.classList.remove("is-dragging");
+  imagesModalGrid.querySelectorAll(".is-drop-target").forEach((el) => el.classList.remove("is-drop-target"));
+});
+
+imagesModalGrid.addEventListener("dragover", (e) => {
+  const tile = e.target.closest(".images-modal-tile");
+  if (!tile) return;
+  e.preventDefault(); // จำเป็น — ไม่งั้น browser จะไม่ยิง drop event ให้เลย
+  e.dataTransfer.dropEffect = "move";
+
+  imagesModalGrid.querySelectorAll(".is-drop-target").forEach((el) => el.classList.remove("is-drop-target"));
+  if (parseInt(tile.dataset.index, 10) !== dragFromIndex) {
+    tile.classList.add("is-drop-target");
+  }
+});
+
+imagesModalGrid.addEventListener("drop", async (e) => {
+  const tile = e.target.closest(".images-modal-tile");
+  if (!tile || dragFromIndex === null) return;
+  e.preventDefault();
+
+  const toIndex = parseInt(tile.dataset.index, 10);
+  if (toIndex === dragFromIndex) return;
+
+  // ย้ายตำแหน่งใน array (splice ออกจากที่เดิม แทรกที่ใหม่)
+  const moved = managedImages.splice(dragFromIndex, 1)[0];
+  managedImages.splice(toIndex, 0, moved);
+  dragFromIndex = null;
+
+  renderManagedImagesGrid(); // optimistic update ให้เห็นผลทันที ไม่ต้องรอ network
+
+  const order = managedImages.map((img) => img.id);
+  const { ok, data } = await apiPatch(`/api/admin/rooms/${managedRoomId}/images/reorder`, { order });
+
+  if (ok) {
+    showToast("จัดลำดับรูปภาพแล้ว", "ok");
+    await loadRooms(); // thumbnail หลักในตารางอาจเปลี่ยนถ้าลำดับที่ 1 เปลี่ยน
+  } else {
+    showToast(data.message || "จัดลำดับไม่สำเร็จ — โหลดข้อมูลเดิมกลับมาแล้ว", "error");
+    await loadManagedImages(); // ดึงของจริงจาก server กลับมาทับ optimistic state ที่ผิดพลาด
+  }
+});
+
+// เปิด modal จากปุ่มในตาราง SECTION 01 — เพิ่ม case นี้เข้าไปใน
+// roomsTbody click handler เดิม (ผูก addEventListener เพิ่มอีกตัว
+// แทนที่จะแก้ handler เดิมโดยตรง เพื่อไม่ต้องแก้โครงสร้าง if-chain
+// ที่มีอยู่แล้วในนั้น — event delegation รองรับหลาย listener ซ้อนกัน
+// บน container เดียวกันได้ปกติ ไม่ชนกัน)
+roomsTbody.addEventListener("click", (e) => {
+  const btn = e.target.closest('button[data-action="manage-room-images"]');
+  if (!btn) return;
+  openImagesModal(btn.dataset.id, btn.dataset.name);
 });
 
 // =================================================================
@@ -671,6 +1137,98 @@ function renderHistoryTable(logs) {
 }
 
 historyFilterAction.addEventListener("change", loadKeysHistory);
+
+// -------------------------------------------------------------
+// ปุ่ม export ประวัติยืม-คืน (CSV/DOCX)
+// -----------------------------------------------------------------
+// endpoint /api/admin/keys/history/export ต้อง auth (JWT) เหมือน
+// /api/admin/* ทุกจุด — ใช้ <a href> ธรรมดาไม่ได้เพราะแนบ Authorization
+// header ไม่ได้ ต้อง fetch ด้วยมือ (คล้าย apiFetch แต่ตั้งใจไม่ใช้
+// apiFetch เดิมตรงๆ เพราะ apiFetch คาดหวัง response เป็น JSON เสมอ
+// (เรียก res.json() ตรงๆ) ในขณะที่ endpoint นี้ตอบกลับเป็นไฟล์ดิบ
+// (CSV/DOCX blob) — ใช้ path คล้าย apiUpload ที่คุยกับ response แบบ
+// binary ได้แทน) แล้วอ่านเป็น Blob มา trigger download ด้วย object URL
+// ชั่วคราว ส่ง filter action ปัจจุบันของตาราง (เหมือนที่ loadKeysHistory
+// ใช้) ไปด้วย เพื่อให้ไฟล์ที่ได้ตรงกับสิ่งที่กำลังดูอยู่บนจอ
+// -------------------------------------------------------------
+const btnExportHistory = document.getElementById("btn-export-history");
+const historyExportFormat = document.getElementById("history-export-format");
+
+function buildExportFilename(disposition, fallback) {
+  // ดึงชื่อไฟล์จาก Content-Disposition header ที่ export.js เซ็ตไว้
+  // (attachment; filename="key-history-YYYY-MM-DD.csv") กันเผื่อ parse
+  // ไม่ได้ (header หาย/รูปแบบเปลี่ยน) ใช้ fallback name แทน ไม่ throw
+  if (!disposition) return fallback;
+  const match = /filename="?([^"]+)"?/.exec(disposition);
+  return match ? match[1] : fallback;
+}
+
+btnExportHistory.addEventListener("click", async () => {
+  const format = historyExportFormat.value;
+  const action = historyFilterAction.value;
+
+  const params = new URLSearchParams({ format });
+  if (action) params.set("action", action);
+
+  const token = getToken();
+  if (!token) {
+    goToLogin();
+    return;
+  }
+
+  btnExportHistory.disabled = true;
+  const originalLabel = btnExportHistory.textContent;
+  btnExportHistory.textContent = "กำลังส่งออก...";
+
+  try {
+    const res = await fetch(`/api/admin/keys/history/export?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      goToLogin();
+      return;
+    }
+
+    if (!res.ok) {
+      // error กรณีนี้ response เป็น JSON (จาก express res.status().json())
+      // ไม่ใช่ไฟล์ — parse แยกจาก success case ด้านล่าง
+      let message = "ส่งออกไม่สำเร็จ";
+      try {
+        const errData = await res.json();
+        message = errData.message || message;
+      } catch (e) {
+        // เงียบไว้ — ใช้ message default
+      }
+      showToast(message, "error");
+      return;
+    }
+
+    const blob = await res.blob();
+    const fallbackExt = format === "docx" ? "docx" : "csv";
+    const filename = buildExportFilename(
+      res.headers.get("Content-Disposition"),
+      `key-history.${fallbackExt}`
+    );
+
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+
+    showToast("ดาวน์โหลดไฟล์แล้ว", "ok");
+  } catch (err) {
+    showToast("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง", "error");
+  } finally {
+    btnExportHistory.disabled = false;
+    btnExportHistory.textContent = originalLabel;
+  }
+});
 
 // =================================================================
 // Init

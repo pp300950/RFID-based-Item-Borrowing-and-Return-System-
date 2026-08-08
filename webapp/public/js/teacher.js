@@ -68,6 +68,61 @@ function formatBorrowedSince(iso) {
 }
 
 // -------------------------------------------------------------
+// Task 9c — badge ช่วงเวลาที่ยืมได้
+// -----------------------------------------------------------------
+// backend (routes/keys.js, GET /api/keys/status) ส่ง borrow_window_days
+// (array เลข 0-6, 0=อาทิตย์..6=เสาร์ หรือ null=ไม่จำกัดวัน) กับ
+// borrow_window_start/_end (สตริงเวลา "HH:MM:SS" หรือ null=ไม่จำกัด
+// เวลา) มาดิบๆ ไม่ตีความ — ฟังก์ชันนี้แปลงเป็นข้อความไทยสั้นๆ เช่น
+// "ยืมได้: จ-ศ 08:00-16:00" ใช้ pattern เดียวกับ formatBorrowWindowSummary
+// ใน admin.js (DAY_ORDER ให้อ่านลำดับ จ-อา แบบปฏิทินไทยทั่วไป แทนที่จะ
+// เรียงตามเลข 0-6 ดิบๆ ซึ่งจะเริ่มที่อาทิตย์)
+//
+// คืนค่า null ถ้าห้องนี้ไม่มีข้อจำกัดเลย (ยืมได้ทุกวันทุกเวลา) เพื่อให้
+// ผู้เรียก (renderItemCard/renderRoomDetailShell) เลือกไม่แสดง badge
+// เลยในกรณีนี้ แทนที่จะโชว์ badge ว่างๆ ที่ไม่มีข้อมูลเป็นประโยชน์
+// -------------------------------------------------------------
+const DAY_LABELS_TH = { 0: "อา", 1: "จ", 2: "อ", 3: "พ", 4: "พฤ", 5: "ศ", 6: "ส" };
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+function formatBorrowWindowLabel(key) {
+  const days = Array.isArray(key.borrow_window_days) ? key.borrow_window_days : null;
+  const start = key.borrow_window_start ? key.borrow_window_start.slice(0, 5) : null;
+  const end = key.borrow_window_end ? key.borrow_window_end.slice(0, 5) : null;
+
+  if (!days && !start && !end) return null;
+
+  const daysLabel = days
+    ? DAY_ORDER.filter((d) => days.includes(d)).map((d) => DAY_LABELS_TH[d]).join("-")
+    : "ทุกวัน";
+  const timeLabel = start && end ? `${start}-${end}` : "ทุกเวลา";
+
+  return `ยืมได้: ${daysLabel} ${timeLabel}`;
+}
+
+// ไอคอนนาฬิกา — ใช้ทั้งในการ์ดกริดและ modal (Task 9c ระบุ "ไอคอน
+// นาฬิกา/ปฏิทิน" ตรงๆ ในสเปค เลือกนาฬิกาเพราะสื่อทั้งวัน+เวลาในไอคอน
+// เดียว ไม่ต้องใช้ 2 ไอคอนแยกกันให้รก) inline SVG แทนไฟล์แยก เพื่อให้
+// สืบทอดสี currentColor จาก CSS ได้เหมือน placeholder icon อื่นๆ ในไฟล์นี้
+const CLOCK_ICON_SVG = `
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <circle cx="12" cy="12" r="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M12 7v5l3.5 2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+`;
+
+function renderBorrowWindowBadge(key, extraClass) {
+  const label = formatBorrowWindowLabel(key);
+  if (!label) return "";
+  return `
+    <div class="borrow-window-badge ${extraClass || ""}">
+      ${CLOCK_ICON_SVG}
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // โหลดสถานะกุญแจ — GET /api/keys/status เป็น endpoint public ไม่ต้อง
 // แนบ token ใดๆ (ดู routes/keys.js: mount แบบไม่ผ่าน requireAuth)
 // -------------------------------------------------------------
@@ -185,6 +240,7 @@ function renderItemCard(key) {
             ? `<div class="item-card-meta">ตั้งแต่ ${escapeHtml(formatBorrowedSince(key.borrowed_at))}</div>`
             : ""
         }
+        ${renderBorrowWindowBadge(key, "item-card-borrow-window")}
         ${durationBlock}
       </div>
     </div>
@@ -334,6 +390,8 @@ function renderRoomDetailShell(key) {
            </div>`
         : ""
     }
+
+    ${renderBorrowWindowBadge(key, "room-modal-borrow-window")}
 
     <div class="room-modal-section">
       <h4 class="room-modal-section-title">ประวัติยืม-คืนล่าสุด</h4>
