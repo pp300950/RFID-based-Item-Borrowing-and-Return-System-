@@ -196,7 +196,8 @@ html, body {
 }
 
 .pass-header--mobile-only,
-.pass-footer--mobile-only {
+.pass-footer--mobile-only,
+.status-link--mobile-only {
   display: none;
 }
 
@@ -518,6 +519,17 @@ input:focus-visible {
   }
   .pass-header--mobile-only { display: block; }
   .pass-card { padding: 32px 28px 24px; }
+
+  /* ปุ่ม "ดูสถานะกุญแจทั้งหมด" สำรอง เฉพาะจอแคบ (ตัวจริงใน .brand-panel
+     ถูกซ่อนไปแล้วทั้งก้อนด้านบน) ใช้ display:flex + width:100% แทน
+     inline-flex เดิม เพราะที่นี่ไม่มี brand-panel ห่อให้ชิดซ้ายแบบเดิม
+     อีกแล้ว ต้องกางเต็มความกว้างการ์ดแทน */
+  .status-link--mobile-only {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    margin: 4px 0 20px;
+  }
 }
 
 @media (max-width: 420px) {

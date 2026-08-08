@@ -121,6 +121,12 @@
 
         <div id="status-msg" class="status-msg" role="status" aria-live="polite"></div>
 
+        <!-- ปุ่ม "ดูสถานะกุญแจทั้งหมด" ตัวจริงอยู่ใน .brand-panel ซึ่งถูก
+             display:none ทิ้งทั้งก้อนบนจอแคบ (ดู style.css @media max-width:860px)
+             เลยต้องมีตัวสำรองไว้ในการ์ดฟอร์มสำหรับ mobile โดยเฉพาะ ไม่งั้น
+             ไม่มีทางกดไปหน้า teacher.html ได้เลยบนมือถือ -->
+        <a href="/teacher.html" class="status-link status-link--mobile-only">ดูสถานะกุญแจทั้งหมด &rarr;</a>
+
         <div class="pass-footer pass-footer--mobile-only">
           <span class="stamp">TEST&nbsp;BUILD</span>
           <span class="footer-text">เวอร์ชันทดสอบ · ข้อมูลเก็บบน Supabase</span>
