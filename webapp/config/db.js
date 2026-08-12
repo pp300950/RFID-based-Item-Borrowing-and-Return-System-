@@ -21,6 +21,9 @@ const pool = mysql.createPool({
   maxIdle: 10,
   idleTimeout: 60000,
   queueLimit: 0,
+  // ค่า default ของ mysql2 (10s) อาจสั้นไปเมื่อเชื่อมผ่าน Cloudflare
+  // Tunnel ที่มี latency สูงกว่าเชื่อม localhost ตรงๆ — เพิ่มเผื่อไว้
+  connectTimeout: 20000,
   // ให้ DATETIME ที่ MySQL คืนมาเป็น string ตรงๆ (ไม่ auto-convert เป็น
   // JS Date ตาม timezone ของเครื่อง) ลดโอกาสงงเรื่อง timezone ตอน
   // ย้ายจาก timestamptz ของ Postgres มา — ถ้า route ไหนอยาก format เอง

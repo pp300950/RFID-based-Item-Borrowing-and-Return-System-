@@ -106,7 +106,13 @@ router.get("/keys/status", async (req, res) => {
 
     return res.json({ ok: true, keys });
   } catch (err) {
-    console.error("Keys status error:", err.message);
+    console.error("Keys status error:", {
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+      sqlMessage: err.sqlMessage,
+      sqlState: err.sqlState,
+    });
     return res.status(500).json({
       ok: false,
       message: "ดึงสถานะกุญแจไม่สำเร็จ",
@@ -183,7 +189,13 @@ router.get("/keys/:id/history", async (req, res) => {
       totalCount,
     });
   } catch (err) {
-    console.error("Room history error:", err.message);
+    console.error("Room history error:", {
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+      sqlMessage: err.sqlMessage,
+      sqlState: err.sqlState,
+    });
     return res.status(500).json({
       ok: false,
       message: "ดึงประวัติกุญแจไม่สำเร็จ",
@@ -278,7 +290,13 @@ router.get("/keys/history/all", async (req, res) => {
       totalPages: Math.max(Math.ceil(totalCount / parsedLimit), 1),
     });
   } catch (err) {
-    console.error("All keys history error:", err.message);
+    console.error("All keys history error:", {
+      message: err.message,
+      code: err.code,
+      errno: err.errno,
+      sqlMessage: err.sqlMessage,
+      sqlState: err.sqlState,
+    });
     return res.status(500).json({
       ok: false,
       message: "ดึงประวัติยืม-คืนไม่สำเร็จ",

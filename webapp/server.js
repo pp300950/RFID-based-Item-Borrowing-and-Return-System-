@@ -1,6 +1,6 @@
 // server.js
 // -----------------------------------------------------------------
-// Entry point ของ backend (Express + Supabase)
+// Entry point ของ backend (Express + MySQL/MariaDB ผ่าน config/db.js)
 //
 // สถาปัตยกรรมใหม่ (ดู README.md ประกอบ):
 //   - ตัดนักเรียนออกทั้งหมด, ตัด "ของ" (room_items) ออก — เหลือแค่
@@ -10,6 +10,16 @@
 //   - /api/tap เป็น endpoint สาธารณะสำหรับเครื่องอ่านแท็กที่ห้องทะเบียน
 //     (ไม่ผ่าน requireAuth เพราะตัวเครื่องเองคือจุดที่ต้องเชื่อถือได้
 //     อยู่แล้วทางกายภาพ ไม่ใช่ "ผู้ใช้ที่ login")
+//
+// ไฟล์นี้ (และทุก route ที่ require เข้ามา) ไม่ผูกกับ "ที่รัน" เลย —
+// การเชื่อมต่อฐานข้อมูลทั้งหมดอ่านจาก environment variables ผ่าน
+// config/db.js (DB_HOST/DB_USER/DB_PASSWORD/DB_NAME) เท่านั้น ไม่มี
+// localhost หรือค่าคงที่ฝังในโค้ดที่ไหนเลย จึงรันได้ด้วยโค้ดชุดเดียวกัน
+// ทั้งสองที่:
+//   - เครื่อง local (npm start + XAMPP): .env ตั้ง DB_HOST=localhost
+//   - Render (ออนไลน์): Environment Variable ตั้ง DB_HOST เป็น
+//     Cloudflare Tunnel ที่ชี้กลับมาที่ MySQL บนเครื่อง local เครื่อง
+//     เดียวกัน (ดู README.md section 7 และ FOR_ME.md section 7)
 // -----------------------------------------------------------------
 
 require("dotenv").config();
@@ -24,9 +34,6 @@ const authRoutes = require("./routes/auth");
 const tapRoutes = require("./routes/tap");
 const keysRoutes = require("./routes/keys");
 const adminRoomsRoutes = require("./routes/admin_rooms");
-// NOTE: keysRoutes ถูก require ไว้แล้วแต่ไม่เคย app.use() จริง — เป็นสาเหตุที่
-// หน้าเว็บ (login.html/teacher.html เดิม) เรียก /api/keys/* แล้ว 404 เพราะ
-// route ไม่เคยถูกต่อเข้าระบบเลย เพิ่ม mount ไว้ด้านล่างแล้ว
 const adminTeachersRoutes = require("./routes/admin_teachers");
 const adminKeysRoutes = require("./routes/admin_keys");
 const exportRoutes = require("./routes/export");
@@ -43,9 +50,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
 // -------------------------------------------------------------
-// Auth routes (สมัคร/ล็อกอินครู, ล็อกอินแอดมิน, /api/me)
+// Auth routes (สมัครครูด้วยการแตะบัตร, ล็อกอินแอดมิน, /api/me)
 //   mount ที่ /api ตรงๆ เพราะแต่ละ route ในไฟล์กำหนด path เต็มไว้แล้ว
-//   เช่น /register/teacher, /login/teacher, /login/admin, /me
+//   เช่น /register/teacher/start, /register/teacher/session,
+//   /register/teacher/cancel, /login/admin, /me
+//   (ครูไม่ login ผ่านเว็บอีกต่อไป — ตัด /register/teacher,
+//   /login/teacher แบบกรอกรหัสเองออกไปแล้วตามสถาปัตยกรรมใหม่)
 // -------------------------------------------------------------
 app.use("/api", authRoutes);
 
