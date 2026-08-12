@@ -20,11 +20,28 @@
 //        - room_tags.status === 'borrowed' โดยครูอื่น -> แจ้ง error ไม่ทำอะไร
 //   3. session หมดอายุอัตโนมัติถ้าไม่มีการแตะกุญแจต่อภายใน TTL ที่ตั้งไว้
 //      (แตะแท็กครูใหม่เพื่อเริ่ม session ใหม่ได้เสมอ)
+//
+// [MySQL migration] จุดที่เปลี่ยนหลักๆ ในไฟล์นี้ (ดู MANIFEST ข้อ 1-3, 9):
+//   - teacher_tags -> teachers embed (Supabase nested select) เขียนเป็น
+//     LEFT JOIN ธรรมดา แล้ว map กลับเป็น shape { teacher_id, teachers: {id, name} }
+//   - room_tags -> borrowed_by:borrowed_by_teacher_id(...) embed เขียนเป็น
+//     LEFT JOIN กับ teachers อีกตัว แล้ว map กลับเป็น
+//     { ...room, borrowed_by: {id, name} | null } เหมือนเดิมทุกจุด
+//   - borrow_window_days เป็น JSON column แล้ว (ไม่ใช่ Postgres smallint[])
+//     ต้อง JSON.parse ก่อนส่งเข้า isWithinBorrowWindow() เพราะ mysql2 คืน
+//     JSON column มาเป็น string ดิบ ไม่ auto-parse ให้เหมือน supabase-js
+//   - .eq(...).eq(...).select().maybeSingle() (conditional update กัน
+//     race) เขียนเป็น UPDATE ... WHERE ... แล้วเช็ค result.affectedRows
+//     === 0 แทนการเช็ค null, แล้ว SELECT แถวใหม่อีกทีหลัง update สำเร็จ
+//     (mysql2 ไม่มี .select() ในตัวเหมือน Supabase)
+//   - แตะแท็กครูใหม่ (auto-register): insert teachers + insert
+//     teacher_tags สองคำสั่งแยกกัน ห่อด้วย withTransaction() จริงตาม
+//     ข้อ 9 ของ MANIFEST (ของเดิมบน Supabase ไม่มี transaction จริงตรงนี้)
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
-const supabase = require("../config/supabaseClient");
+const { query, withTransaction } = require("../config/db");
 const {
   getPendingRegistration,
   resolveRegistration,
@@ -79,6 +96,11 @@ function clearSession(readerId) {
 //     now <= end) แทนแบบปกติ (now >= start && now <= end)
 //   - เฉพาะการ "ยืม" เท่านั้นที่ถูกเช็คนี้กัน — การ "คืน" ไม่ต้องเรียก
 //     ฟังก์ชันนี้เลย (ดูจุดเรียกใช้ด้านล่าง)
+//
+// [MySQL] ฟังก์ชันนี้ไม่แก้ logic เลย ยังรับ roomTag.borrow_window_days
+// เป็น JS array/null เหมือนเดิม — การแปลงจาก JSON string ของ MySQL เป็น
+// array ทำที่จุดโหลด roomTag ก่อนเรียกฟังก์ชันนี้ (ดู parseRoomTagRow)
+// เพื่อให้ฟังก์ชันนี้ไม่ต้องรู้เรื่อง MySQL เลย
 // -------------------------------------------------------------
 function isWithinBorrowWindow(roomTag) {
   const now = new Date();
@@ -101,9 +123,9 @@ function isWithinBorrowWindow(roomTag) {
     return true;
   }
 
-  // เทียบแบบ string "HH:MM:SS" ตรงๆ ได้เลย เพราะ postgres time type
-  // จะถูก serialize มาเป็นรูปแบบนี้เสมอผ่าน supabase-js และ string
-  // เทียบ lexicographic ตรงกับลำดับเวลาในหนึ่งวันพอดี
+  // เทียบแบบ string "HH:MM:SS" ตรงๆ ได้เลย — mysql2 กับ dateStrings:true
+  // (ดู config/db.js) คืนค่า TIME column มาเป็น "HH:MM:SS" ตรงๆ อยู่แล้ว
+  // เหมือนที่ postgres time type เคยถูก serialize มาผ่าน supabase-js
   const pad2 = (n) => String(n).padStart(2, "0");
   const nowTimeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
 
@@ -115,6 +137,48 @@ function isWithinBorrowWindow(roomTag) {
   // ช่วงข้ามเที่ยงคืน (เช่น 22:00:00–06:00:00)
   return nowTimeStr >= start || nowTimeStr <= end;
 }
+
+// -------------------------------------------------------------
+// parseRoomTagRow(row) -> roomTag shape เดิมที่ route ด้านล่างคาดหวัง
+// รับแถวดิบจาก JOIN query (มี prefix borrowed_by_id / borrowed_by_name
+// จาก LEFT JOIN teachers) มาแปลงเป็น:
+//   { id, room_name, status, borrowed_by_teacher_id,
+//     borrowed_by: { id, name } | null,
+//     borrow_window_days: array | null,   // parse จาก JSON string
+//     borrow_window_start, borrow_window_end }
+//
+// [MySQL] แทนที่ Supabase nested select
+// "borrowed_by:borrowed_by_teacher_id(id, name)" — ดู MANIFEST ข้อ 3
+// -------------------------------------------------------------
+function parseRoomTagRow(row) {
+  return {
+    id: row.id,
+    room_name: row.room_name,
+    status: row.status,
+    borrowed_by_teacher_id: row.borrowed_by_teacher_id,
+    borrowed_by:
+      row.borrowed_by_teacher_id != null
+        ? { id: row.borrowed_by_id, name: row.borrowed_by_name }
+        : null,
+    borrow_window_days:
+      row.borrow_window_days == null
+        ? null
+        : typeof row.borrow_window_days === "string"
+        ? JSON.parse(row.borrow_window_days)
+        : row.borrow_window_days, // เผื่อ driver บาง config parse JSON ให้อัตโนมัติแล้ว
+    borrow_window_start: row.borrow_window_start,
+    borrow_window_end: row.borrow_window_end,
+  };
+}
+
+const ROOM_TAG_SELECT_SQL = `
+  SELECT
+    rt.id, rt.room_name, rt.status, rt.borrowed_by_teacher_id,
+    rt.borrow_window_days, rt.borrow_window_start, rt.borrow_window_end,
+    t.id AS borrowed_by_id, t.name AS borrowed_by_name
+  FROM room_tags rt
+  LEFT JOIN teachers t ON t.id = rt.borrowed_by_teacher_id
+`;
 
 // -------------------------------------------------------------
 // POST /api/tap
@@ -144,18 +208,24 @@ router.post("/tap", async (req, res) => {
     // เช็คก่อนว่าแท็กนี้เป็นแท็กครูหรือแท็กกุญแจ (สอง table แยกกัน
     // เพราะเลขแท็กแต่ละประเภทไม่ชนกันอยู่แล้วโดย unique constraint
     // ของแต่ละ table เอง)
+    //
+    // [MySQL] teacher_tags(...).select("teacher_id, teachers(id, name)")
+    // -> LEFT JOIN teachers ธรรมดา (ดู MANIFEST ข้อ 3)
     // -----------------------------------------------------------
-    const { data: teacherTag, error: teacherTagError } = await supabase
-      .from("teacher_tags")
-      .select("teacher_id, teachers(id, name)")
-      .eq("tag_uid", cleanTagUid)
-      .maybeSingle();
+    const [teacherTagRows] = await query(
+      `SELECT tt.teacher_id, t.id AS teacher_id_full, t.name AS teacher_name
+       FROM teacher_tags tt
+       JOIN teachers t ON t.id = tt.teacher_id
+       WHERE tt.tag_uid = ?
+       LIMIT 1`,
+      [cleanTagUid]
+    );
 
-    if (teacherTagError) throw teacherTagError;
+    const teacherTag = teacherTagRows.length > 0 ? teacherTagRows[0] : null;
 
     // --- กรณี 1: แตะแท็กครู ---
     if (teacherTag) {
-      const teacher = teacherTag.teachers;
+      const teacher = { id: teacherTag.teacher_id_full, name: teacherTag.teacher_name };
 
       // ถ้า readerId นี้กำลังอยู่ในโหมดรอสมัครครูคนใหม่พอดี แปลว่าคนที่
       // กำลังสมัครแตะบัตรใบที่ "มีคนใช้อยู่แล้ว" เข้ามา (บัตรประจำตัว
@@ -187,16 +257,15 @@ router.post("/tap", async (req, res) => {
     }
 
     // --- ไม่ใช่แท็กครู -> เช็คว่าเป็นแท็กกุญแจไหม ---
-    const { data: roomTag, error: roomTagError } = await supabase
-      .from("room_tags")
-      .select(
-        "id, room_name, status, borrowed_by_teacher_id, borrowed_by:borrowed_by_teacher_id(id, name), " +
-          "borrow_window_days, borrow_window_start, borrow_window_end"
-      )
-      .eq("tag_uid", cleanTagUid)
-      .maybeSingle();
+    // [MySQL] room_tags(...).select("..., borrowed_by:borrowed_by_teacher_id(id, name), ...")
+    // -> ROOM_TAG_SELECT_SQL (LEFT JOIN teachers) แล้ว parseRoomTagRow()
+    // แปลงกลับเป็น shape เดิม (ดู MANIFEST ข้อ 3)
+    const [roomTagRows] = await query(
+      `${ROOM_TAG_SELECT_SQL} WHERE rt.tag_uid = ? LIMIT 1`,
+      [cleanTagUid]
+    );
 
-    if (roomTagError) throw roomTagError;
+    const roomTag = roomTagRows.length > 0 ? parseRoomTagRow(roomTagRows[0]) : null;
 
     if (!roomTag) {
       // -------------------------------------------------------
@@ -221,31 +290,41 @@ router.post("/tap", async (req, res) => {
       }
 
       try {
-        const { data: createdTeacher, error: createTeacherError } = await supabase
-          .from("teachers")
-          .insert({
-            name: pending.name,
-            department: pending.department,
-            // teachers.teacher_code เป็น NOT NULL ใน schema จริง แต่ flow
-            // สมัครผ่านการแตะบัตรนี้ไม่มีขั้นตอนให้ครูกรอกรหัสเอง จึงใช้
-            // tag_uid ของบัตรที่แตะเป็น teacher_code ไปเลย — รับประกัน
-            // ไม่ซ้ำอยู่แล้วเพราะ tag_uid มี unique constraint ในตัว
-            teacher_code: cleanTagUid,
-            last_login_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
+        // [MySQL] insert teachers + insert teacher_tags สองคำสั่งแยกกัน
+        // -> ห่อด้วย withTransaction() จริงตามข้อ 9 ของ MANIFEST (ของเดิม
+        // บน Supabase ไม่มี transaction จริงตรงนี้ — ถ้า insert ที่สอง
+        // ล้มเหลว ครูที่สร้างไปแล้วจะค้างไม่มี tag ผูก) ที่นี่ถ้า insert
+        // ใดล้มเหลว rollback ทั้งคู่กลับ ไม่ทิ้งครูกำพร้าไว้
+        const createdTeacher = await withTransaction(async (conn) => {
+          const [insertTeacherResult] = await conn.query(
+            `INSERT INTO teachers (name, department, teacher_code, last_login_at)
+             VALUES (?, ?, ?, ?)`,
+            [
+              pending.name,
+              pending.department,
+              // teachers.teacher_code เป็น NOT NULL ใน schema จริง แต่ flow
+              // สมัครผ่านการแตะบัตรนี้ไม่มีขั้นตอนให้ครูกรอกรหัสเอง จึงใช้
+              // tag_uid ของบัตรที่แตะเป็น teacher_code ไปเลย — รับประกัน
+              // ไม่ซ้ำอยู่แล้วเพราะ tag_uid มี unique constraint ในตัว
+              cleanTagUid,
+              new Date(),
+            ]
+          );
 
-        if (createTeacherError) throw createTeacherError;
+          const teacherId = insertTeacherResult.insertId;
 
-        const { error: createTagError } = await supabase
-          .from("teacher_tags")
-          .insert({
-            teacher_id: createdTeacher.id,
-            tag_uid: cleanTagUid,
-          });
+          await conn.query(
+            `INSERT INTO teacher_tags (teacher_id, tag_uid) VALUES (?, ?)`,
+            [teacherId, cleanTagUid]
+          );
 
-        if (createTagError) throw createTagError;
+          const [teacherRows] = await conn.query(
+            `SELECT id, name FROM teachers WHERE id = ?`,
+            [teacherId]
+          );
+
+          return teacherRows[0];
+        });
 
         resolveRegistration(reader, {
           ok: true,
@@ -299,21 +378,21 @@ router.post("/tap", async (req, res) => {
         });
       }
 
-      const { data: updated, error: updateError } = await supabase
-        .from("room_tags")
-        .update({
-          status: "borrowed",
-          borrowed_by_teacher_id: session.teacherId,
-          borrowed_at: new Date().toISOString(),
-        })
-        .eq("id", roomTag.id)
-        .eq("status", "available") // conditional update กันแตะรัว/race
-        .select()
-        .maybeSingle();
+      // [MySQL] .update({...}).eq("id", roomTag.id).eq("status", "available")
+      // .select().maybeSingle() -> UPDATE ... WHERE ... แล้วเช็ค
+      // affectedRows === 0 แทนการเช็ค null (ดู MANIFEST ข้อ 2) — ถ้า
+      // affectedRows > 0 ถึงจะ SELECT แถวใหม่กลับมา (mysql2 ไม่มี
+      // .select() ในตัวเหมือน Supabase)
+      const [updateResult] = await query(
+        `UPDATE room_tags
+         SET status = 'borrowed', borrowed_by_teacher_id = ?, borrowed_at = ?
+         WHERE id = ? AND status = 'available'`,
+        [session.teacherId, new Date(), roomTag.id]
+      );
 
-      if (updateError) throw updateError;
-
-      if (!updated) {
+      if (updateResult.affectedRows === 0) {
+        // มีคนแตะแซงไปก่อนแล้ว (เช็คแล้วตอน SELECT ด้านบนว่า available
+        // แต่พอจะ UPDATE จริงมีคนอื่นเปลี่ยนสถานะไปก่อนพอดี)
         return res.status(409).json({
           ok: false,
           state: "wrong_teacher",
@@ -321,11 +400,10 @@ router.post("/tap", async (req, res) => {
         });
       }
 
-      await supabase.from("key_logs").insert({
-        room_tag_id: roomTag.id,
-        teacher_id: session.teacherId,
-        action: "borrow",
-      });
+      await query(
+        `INSERT INTO key_logs (room_tag_id, teacher_id, action) VALUES (?, ?, 'borrow')`,
+        [roomTag.id, session.teacherId]
+      );
 
       return res.json({
         ok: true,
@@ -339,22 +417,17 @@ router.post("/tap", async (req, res) => {
     // status === 'borrowed' ตอนนี้
     if (roomTag.borrowed_by_teacher_id === session.teacherId) {
       // คืน (ครูคนเดิมที่ยืมไปแตะซ้ำ)
-      const { data: updated, error: updateError } = await supabase
-        .from("room_tags")
-        .update({
-          status: "available",
-          borrowed_by_teacher_id: null,
-          borrowed_at: null,
-        })
-        .eq("id", roomTag.id)
-        .eq("status", "borrowed")
-        .eq("borrowed_by_teacher_id", session.teacherId) // conditional update กัน race
-        .select()
-        .maybeSingle();
+      // [MySQL] conditional update กัน race เหมือนจุดยืมด้านบน แต่เช็ค
+      // เงื่อนไขเพิ่มอีกชั้น (status = 'borrowed' AND borrowed_by_teacher_id = ?)
+      // ตรงกับ .eq().eq().eq() สามชั้นของเดิม
+      const [updateResult] = await query(
+        `UPDATE room_tags
+         SET status = 'available', borrowed_by_teacher_id = NULL, borrowed_at = NULL
+         WHERE id = ? AND status = 'borrowed' AND borrowed_by_teacher_id = ?`,
+        [roomTag.id, session.teacherId]
+      );
 
-      if (updateError) throw updateError;
-
-      if (!updated) {
+      if (updateResult.affectedRows === 0) {
         return res.status(409).json({
           ok: false,
           state: "wrong_teacher",
@@ -362,11 +435,10 @@ router.post("/tap", async (req, res) => {
         });
       }
 
-      await supabase.from("key_logs").insert({
-        room_tag_id: roomTag.id,
-        teacher_id: session.teacherId,
-        action: "return",
-      });
+      await query(
+        `INSERT INTO key_logs (room_tag_id, teacher_id, action) VALUES (?, ?, 'return')`,
+        [roomTag.id, session.teacherId]
+      );
 
       return res.json({
         ok: true,

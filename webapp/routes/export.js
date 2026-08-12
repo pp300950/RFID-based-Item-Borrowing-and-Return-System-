@@ -17,11 +17,19 @@
 // ตารางที่กำลังดูอยู่ตรงๆ ได้เลย ไม่ต้อง map ชื่อ param ใหม่):
 //   roomTagId, teacherId, action ("borrow"|"return"), limit (default 100, max 500)
 //   format ("csv" | "docx", default "csv")
+//
+// [MySQL migration] แก้เฉพาะ fetchHistoryForExport() — เปลี่ยนจาก
+// PostgREST nested embed (room_tags(...), teachers(...)) เป็น JOIN
+// ธรรมดา แล้ว reshape ผลลัพธ์กลับให้ row.room_tags / row.teachers เป็น
+// nested object ชื่อ/ทรงเดิมทุกประการ เพราะ buildCsv()/buildDocx()
+// ทั้งสองอ่าน row.room_tags.room_name, row.teachers.name,
+// row.teachers.department ตรงๆ — ไม่แตะสองฟังก์ชันนั้นเลยตามหลักการ
+// ของงานนี้ (แก้เฉพาะชั้นที่คุยกับฐานข้อมูล)
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
-const supabase = require("../config/supabaseClient");
+const { query } = require("../config/db");
 const {
   Document,
   Packer,
@@ -46,25 +54,73 @@ const EXPORT_LIMIT_MAX = 500;
 // รูปแบบ — ไม่ได้ import จาก admin_keys.js ตรงๆ เพราะไฟล์นั้น export
 // แค่ router ไม่ได้ export ฟังก์ชัน query แยก และไม่อยากแก้ shape ของ
 // ไฟล์นั้นแค่เพื่อ export ไฟล์นี้
+//
+// [MySQL] JOIN room_tags + teachers ตรงๆ (LEFT JOIN เผื่อแถวกำพร้า —
+// key_logs มี FK ON DELETE CASCADE ไปทั้งสองตารางอยู่แล้วตาม
+// schema.sql เลยในทางปฏิบัติแทบไม่มีทาง NULL แต่ใช้ LEFT JOIN ไว้กัน
+// พลาดเข้าใกล้พฤติกรรมเดิมที่สุด แทนที่จะสมมติว่าไม่มีทาง null) แล้ว
+// map แต่ละแถวกลับเป็น { ...log fields, room_tags: {...}|null,
+// teachers: {...}|null } ให้ตรง shape ที่ PostgREST embed เคยคืนมา
 // -------------------------------------------------------------
 async function fetchHistoryForExport({ roomTagId, teacherId, action, limit }) {
   const parsedLimit = Math.min(parseInt(limit, 10) || EXPORT_LIMIT_DEFAULT, EXPORT_LIMIT_MAX);
 
-  let query = supabase
-    .from("key_logs")
-    .select(
-      "id, action, acted_at, room_tags(id, room_name), teachers(id, name, department)"
-    )
-    .order("acted_at", { ascending: false })
-    .limit(parsedLimit);
+  const conditions = [];
+  const params = [];
 
-  if (roomTagId) query = query.eq("room_tag_id", roomTagId);
-  if (teacherId) query = query.eq("teacher_id", teacherId);
-  if (action === "borrow" || action === "return") query = query.eq("action", action);
+  if (roomTagId) {
+    conditions.push("kl.room_tag_id = ?");
+    params.push(roomTagId);
+  }
+  if (teacherId) {
+    conditions.push("kl.teacher_id = ?");
+    params.push(teacherId);
+  }
+  if (action === "borrow" || action === "return") {
+    conditions.push("kl.action = ?");
+    params.push(action);
+  }
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const sql = `
+    SELECT
+      kl.id,
+      kl.action,
+      kl.acted_at,
+      rt.id AS room_tags_id,
+      rt.room_name AS room_tags_room_name,
+      t.id AS teachers_id,
+      t.name AS teachers_name,
+      t.department AS teachers_department
+    FROM key_logs kl
+    LEFT JOIN room_tags rt ON rt.id = kl.room_tag_id
+    LEFT JOIN teachers t ON t.id = kl.teacher_id
+    ${whereClause}
+    ORDER BY kl.acted_at DESC
+    LIMIT ?
+  `;
+  params.push(parsedLimit);
+
+  const [rows] = await query(sql, params);
+
+  return rows.map((row) => ({
+    id: row.id,
+    action: row.action,
+    acted_at: row.acted_at,
+    room_tags:
+      row.room_tags_id === null
+        ? null
+        : { id: row.room_tags_id, room_name: row.room_tags_room_name },
+    teachers:
+      row.teachers_id === null
+        ? null
+        : {
+            id: row.teachers_id,
+            name: row.teachers_name,
+            department: row.teachers_department,
+          },
+  }));
 }
 
 // -------------------------------------------------------------

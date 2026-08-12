@@ -13,7 +13,12 @@
 // -----------------------------------------------------------------
 const express = require("express");
 const router = express.Router();
-const supabase = require("../config/supabaseClient");
+// [MySQL migration] เดิม require("../config/supabaseClient") ไว้ตรงนี้
+// แต่ไม่มีจุดไหนในไฟล์นี้เรียกใช้ supabase client เลยสักครั้ง — flow
+// สร้างครูทั้งหมดย้ายไปทำใน tap.js (insert teachers/teacher_tags ผ่าน
+// register_session.js แบบ in-memory) ส่วน login แอดมินก็เทียบกับ env
+// var ตรงๆ ไม่แตะ DB จึงตัด import ทิ้งไปเลย ไม่ต้องแทนด้วย
+// require("../config/db") เพราะไม่มี query ให้เรียกในไฟล์นี้จริงๆ
 const { signToken, requireAuth } = require("./middleware_auth");
 const {
   startRegistration,

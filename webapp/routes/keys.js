@@ -11,47 +11,100 @@
 // แทน ไม่ใช่หน้าสาธารณะ
 //
 // Auth: mount แบบ public ใน server.js (ไม่ผ่าน requireAuth)
+//
+// *** ย้ายจาก Supabase -> MySQL (XAMPP) ***
+// แก้เฉพาะชั้นที่คุยกับฐานข้อมูล — endpoint path, response shape,
+// เงื่อนไข business logic เหมือนเดิมทุกจุด (ดู MANIFEST)
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
-const supabase = require("../config/supabaseClient");
+const { query } = require("../config/db");
+
+// mysql2 ไม่ auto-parse คอลัมน์ type JSON ให้เป็น JS array เสมอไป (ขึ้นกับ
+// เวอร์ชัน/การตั้งค่า) — กันไว้ทั้งสองแบบเหมือนที่ทำใน tap.js (MANIFEST
+// ข้อ 1) ถ้าเจอ string ให้ parse, ถ้า driver parse มาให้แล้วก็ใช้ตรงๆ
+function parseBorrowWindowDays(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return value;
+}
 
 // -------------------------------------------------------------
 // GET /api/keys/status
 // สถานะปัจจุบันของกุญแจทุกดอก (ว่าง/ถูกยืม + ใครยืมอยู่)
 //
-// *** ขยายเพิ่ม (MANIFEST Task 5a) ***
-//   - room_images: อาร์เรย์รูปภาพทั้งหมดของห้อง/กุญแจนั้น เรียงตาม
-//     sort_order (แทนที่/เสริม image_url เดี่ยวเดิมซึ่งยังคงส่งมาด้วย
-//     เพื่อ backward compat — ดู schema.sql migration note) ใช้ embed
-//     แบบ nested ของ PostgREST ตรงๆ ในนี้เลย ไม่ต้อง query แยก เพราะ
-//     เป็น 1 request เดียวที่ join ผ่าน FK room_images.room_tag_id ได้
-//     อยู่แล้ว ต่างจาก isCurrentlyBorrowed ใน admin_keys.js (Task 4)
-//     ที่ต้อง query แยกเพราะเป็นการเทียบข้ามตาราง key_logs <-> room_tags
-//     คนละ FK กัน ไม่ใช่ embed เดียวกัน
-//   - borrow_window_days / borrow_window_start / borrow_window_end: ส่ง
-//     ตรงๆ ตามที่เก็บในคอลัมน์ (null = ไม่จำกัด) ให้ฝั่งหน้าเว็บ
-//     (teacher.js, Task 9c) ไปแสดงเป็น badge ช่วงเวลาที่ยืมได้เอง —
-//     endpoint นี้แค่ส่งข้อมูลดิบ ไม่ตีความ/ฟอร์แมตข้อความ
+// ของเดิมใช้ PostgREST embed ดึง borrowed_by (1:1 ผ่าน FK) และ
+// room_images (1:many ผ่าน FK) มาในคำสั่งเดียว — MySQL ไม่มี embed
+// แบบนี้ เลยแยกเป็น 2 query: (1) ห้องทั้งหมด + LEFT JOIN teachers
+// สำหรับ borrowed_by (ยัง 1:1 join ตรงๆ ได้ปกติ) (2) รูปทั้งหมดของ
+// ห้องที่ดึงมาในรอบแรก ด้วย WHERE room_tag_id IN (...) แล้ว group
+// เข้าด้วยกันในโค้ด JS — ตรงตาม MANIFEST ข้อ 4 (ห้ามลืม sort ตาม
+// sort_order ตอน group)
 // -------------------------------------------------------------
 router.get("/keys/status", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("room_tags")
-      .select(
-        "id, room_name, tag_uid, description, is_active, status, borrowed_at, image_url, " +
-          "borrow_window_days, borrow_window_start, borrow_window_end, " +
-          "borrowed_by:borrowed_by_teacher_id(id, name, department), " +
-          "room_images(id, image_url, sort_order)"
-      )
-      .eq("is_active", true)
-      .order("room_name", { ascending: true })
-      .order("sort_order", { foreignTable: "room_images", ascending: true });
+    const [roomRows] = await query(
+      `SELECT
+         rt.id, rt.room_name, rt.tag_uid, rt.description, rt.is_active,
+         rt.status, rt.borrowed_at, rt.image_url,
+         rt.borrow_window_days, rt.borrow_window_start, rt.borrow_window_end,
+         t.id AS borrower_id, t.name AS borrower_name, t.department AS borrower_department
+       FROM room_tags rt
+       LEFT JOIN teachers t ON t.id = rt.borrowed_by_teacher_id
+       WHERE rt.is_active = 1
+       ORDER BY rt.room_name ASC`
+    );
 
-    if (error) throw error;
+    const roomIds = roomRows.map((r) => r.id);
 
-    return res.json({ ok: true, keys: data });
+    let imagesByRoomId = new Map();
+    if (roomIds.length > 0) {
+      const [imageRows] = await query(
+        `SELECT id, room_tag_id, image_url, sort_order
+         FROM room_images
+         WHERE room_tag_id IN (?)
+         ORDER BY sort_order ASC`,
+        [roomIds]
+      );
+
+      imagesByRoomId = new Map();
+      for (const img of imageRows) {
+        if (!imagesByRoomId.has(img.room_tag_id)) imagesByRoomId.set(img.room_tag_id, []);
+        imagesByRoomId.get(img.room_tag_id).push({
+          id: img.id,
+          image_url: img.image_url,
+          sort_order: img.sort_order,
+        });
+      }
+    }
+
+    const keys = roomRows.map((r) => ({
+      id: r.id,
+      room_name: r.room_name,
+      tag_uid: r.tag_uid,
+      description: r.description,
+      is_active: !!r.is_active,
+      status: r.status,
+      borrowed_at: r.borrowed_at,
+      image_url: r.image_url,
+      borrow_window_days: parseBorrowWindowDays(r.borrow_window_days),
+      borrow_window_start: r.borrow_window_start,
+      borrow_window_end: r.borrow_window_end,
+      borrowed_by:
+        r.borrower_id !== null
+          ? { id: r.borrower_id, name: r.borrower_name, department: r.borrower_department }
+          : null,
+      room_images: imagesByRoomId.get(r.id) || [],
+    }));
+
+    return res.json({ ok: true, keys });
   } catch (err) {
     console.error("Keys status error:", err.message);
     return res.status(500).json({
@@ -84,41 +137,50 @@ router.get("/keys/:id/history", async (req, res) => {
     // เช็คก่อนว่าห้อง/กุญแจนี้มีอยู่จริง (แยก query จาก history เพื่อให้
     // แยกแยะ "ห้องไม่มีอยู่" (404) ออกจาก "ห้องมีอยู่แต่ยังไม่เคยมี
     // ประวัติเลย" (200, logs: [], totalCount: 0) ได้ชัดเจน)
-    const { data: room, error: roomError } = await supabase
-      .from("room_tags")
-      .select("id, room_name")
-      .eq("id", roomTagId)
-      .maybeSingle();
+    const [roomRows] = await query("SELECT id, room_name FROM room_tags WHERE id = ?", [
+      roomTagId,
+    ]);
 
-    if (roomError) throw roomError;
-
-    if (!room) {
+    if (roomRows.length === 0) {
       return res.status(404).json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
     }
+    const room = roomRows[0];
 
-    // นับ total count แยกจากการดึง 10 รายการ (count: "exact", head: true
-    // -> ไม่ดึง body กลับมา แค่เอาเลขนับ ประหยัดกว่าดึงมาทั้งหมดแล้วนับเอง)
-    const { count: totalCount, error: countError } = await supabase
-      .from("key_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("room_tag_id", roomTagId);
+    // นับ total count แยกจากการดึง 10 รายการ — เทียบเท่า count: "exact",
+    // head: true ของ Supabase (แค่เอาเลขนับ ไม่ต้องดึง body)
+    const [countRows] = await query(
+      "SELECT COUNT(*) AS total FROM key_logs WHERE room_tag_id = ?",
+      [roomTagId]
+    );
+    const totalCount = countRows[0].total;
 
-    if (countError) throw countError;
+    const [logRows] = await query(
+      `SELECT
+         kl.id, kl.action, kl.acted_at,
+         t.id AS teacher_id, t.name AS teacher_name, t.department AS teacher_department
+       FROM key_logs kl
+       LEFT JOIN teachers t ON t.id = kl.teacher_id
+       WHERE kl.room_tag_id = ?
+       ORDER BY kl.acted_at DESC
+       LIMIT ?`,
+      [roomTagId, ROOM_HISTORY_PREVIEW_LIMIT]
+    );
 
-    const { data: logs, error: logsError } = await supabase
-      .from("key_logs")
-      .select("id, action, acted_at, teachers(id, name, department)")
-      .eq("room_tag_id", roomTagId)
-      .order("acted_at", { ascending: false })
-      .limit(ROOM_HISTORY_PREVIEW_LIMIT);
-
-    if (logsError) throw logsError;
+    const logs = logRows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      acted_at: r.acted_at,
+      teachers:
+        r.teacher_id !== null
+          ? { id: r.teacher_id, name: r.teacher_name, department: r.teacher_department }
+          : null,
+    }));
 
     return res.json({
       ok: true,
       room: { id: room.id, roomName: room.room_name },
-      logs: logs || [],
-      totalCount: totalCount || 0,
+      logs,
+      totalCount,
     });
   } catch (err) {
     console.error("Room history error:", err.message);
@@ -142,6 +204,14 @@ router.get("/keys/:id/history", async (req, res) => {
 // filter หลากหลายกว่า (teacherId, action) หน้านี้ตั้งใจให้เรียบง่าย
 // กว่าเพราะเป็นหน้า public ที่ใครก็เข้าดูได้ — ไม่มี filter เพิ่มเติม
 // นอกจาก roomId ตาม scope ที่ล็อกไว้ใน MANIFEST
+//
+// ของเดิม { count: "exact" } + .range(from, to) ได้ count คู่กับข้อมูล
+// ใน query เดียว — MySQL แยกเป็น 2 query ชัดเจนตาม MANIFEST ข้อ 5:
+// SELECT COUNT(*) ... แล้วค่อย SELECT ... LIMIT ? OFFSET ?
+//
+// สำคัญ: response ของแถวต้องมี key ชื่อ room_tags / teachers (ไม่ใช่
+// room / teacher) เพราะ public/js/history.js ที่มีอยู่แล้วอ่านจาก
+// log.room_tags.room_name และ log.teachers.name ตรงๆ
 // -------------------------------------------------------------
 const HISTORY_PAGE_SIZE_DEFAULT = 20;
 const HISTORY_PAGE_SIZE_MAX = 100;
@@ -154,39 +224,58 @@ router.get("/keys/history/all", async (req, res) => {
     Math.max(parseInt(limit, 10) || HISTORY_PAGE_SIZE_DEFAULT, 1),
     HISTORY_PAGE_SIZE_MAX
   );
+  const offset = (parsedPage - 1) * parsedLimit;
 
-  const from = (parsedPage - 1) * parsedLimit;
-  const to = from + parsedLimit - 1;
+  let parsedRoomId = null;
+  if (roomId) {
+    parsedRoomId = parseInt(roomId, 10);
+    if (!Number.isInteger(parsedRoomId)) {
+      return res.status(400).json({ ok: false, message: "รหัสห้อง/กุญแจไม่ถูกต้อง" });
+    }
+  }
 
   try {
-    let query = supabase
-      .from("key_logs")
-      .select(
-        "id, action, acted_at, room_tags(id, room_name), teachers(id, name, department)",
-        { count: "exact" }
-      )
-      .order("acted_at", { ascending: false })
-      .range(from, to);
+    const whereClause = parsedRoomId !== null ? "WHERE kl.room_tag_id = ?" : "";
+    const whereParams = parsedRoomId !== null ? [parsedRoomId] : [];
 
-    if (roomId) {
-      const parsedRoomId = parseInt(roomId, 10);
-      if (!Number.isInteger(parsedRoomId)) {
-        return res.status(400).json({ ok: false, message: "รหัสห้อง/กุญแจไม่ถูกต้อง" });
-      }
-      query = query.eq("room_tag_id", parsedRoomId);
-    }
+    const [countRows] = await query(
+      `SELECT COUNT(*) AS total FROM key_logs kl ${whereClause}`,
+      whereParams
+    );
+    const totalCount = countRows[0].total;
 
-    const { data, error, count } = await query;
+    const [logRows] = await query(
+      `SELECT
+         kl.id, kl.action, kl.acted_at,
+         rt.id AS room_id, rt.room_name,
+         t.id AS teacher_id, t.name AS teacher_name, t.department AS teacher_department
+       FROM key_logs kl
+       LEFT JOIN room_tags rt ON rt.id = kl.room_tag_id
+       LEFT JOIN teachers t ON t.id = kl.teacher_id
+       ${whereClause}
+       ORDER BY kl.acted_at DESC
+       LIMIT ? OFFSET ?`,
+      [...whereParams, parsedLimit, offset]
+    );
 
-    if (error) throw error;
+    const logs = logRows.map((r) => ({
+      id: r.id,
+      action: r.action,
+      acted_at: r.acted_at,
+      room_tags: r.room_id !== null ? { id: r.room_id, room_name: r.room_name } : null,
+      teachers:
+        r.teacher_id !== null
+          ? { id: r.teacher_id, name: r.teacher_name, department: r.teacher_department }
+          : null,
+    }));
 
     return res.json({
       ok: true,
-      logs: data || [],
+      logs,
       page: parsedPage,
       limit: parsedLimit,
-      totalCount: count || 0,
-      totalPages: Math.max(Math.ceil((count || 0) / parsedLimit), 1),
+      totalCount,
+      totalPages: Math.max(Math.ceil(totalCount / parsedLimit), 1),
     });
   } catch (err) {
     console.error("All keys history error:", err.message);

@@ -5,27 +5,56 @@
 //   2. assign เลขแท็กให้ครู (teacher_tags, 1:1 กับ teachers)
 // รวมสองส่วนไว้ไฟล์เดียวเพราะทั้งคู่ผูกกับหน้า "แท็กครู" เดียวกันใน
 // admin dashboard และมีขนาดเล็กพอที่ไม่ต้องแยกไฟล์ (ดู MANIFEST Task 3)
+//
+// *** ย้ายจาก Supabase -> MySQL (XAMPP) ***
+// แก้เฉพาะชั้นที่คุยกับฐานข้อมูล — endpoint path, response shape
+// ({ ok, ... }), และเงื่อนไข business logic เหมือนเดิมทุกจุด
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
-const supabase = require("../config/supabaseClient");
+const { query } = require("../config/db");
+
+// mysql2 คืน duplicate-key error เป็น errno 1062 / code ER_DUP_ENTRY —
+// ใช้เป็น safety net เผื่อ race condition แทรกระหว่าง pre-check กับ
+// insert จริง (ของเดิมบน Supabase ก็มีช่องโหว่นี้เหมือนกัน แต่ MySQL
+// unique key ช่วยจับได้ชัดเจนกว่าด้วย error code ตรงๆ)
+function isDuplicateKeyError(err) {
+  return err && (err.code === "ER_DUP_ENTRY" || err.errno === 1062);
+}
 
 // -------------------------------------------------------------
 // GET /api/admin/teacher-tags
 // ดึงรายการ "ครูทั้งหมด" พร้อมสถานะว่ามีแท็กหรือยัง (left join teacher_tags)
 // เพื่อให้หน้าแอดมินเห็นครูที่ยังไม่มีแท็กได้ง่ายๆ ในรายการเดียว
+//
+// ของเดิม embed teacher_tags(...) เป็น object เดียว (ไม่ใช่ array) เพราะ
+// เป็นความสัมพันธ์ 1:1 — ที่นี่ทำ LEFT JOIN ตรงๆ แล้ว map กลับเป็น
+// shape เดิม { ...teacher, teacher_tags: {id, tag_uid, assigned_at} | null }
 // -------------------------------------------------------------
 router.get("/teacher-tags", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("teachers")
-      .select("id, name, department, teacher_code, teacher_tags(id, tag_uid, assigned_at)")
-      .order("name", { ascending: true });
+    const [rows] = await query(
+      `SELECT
+         t.id, t.name, t.department, t.teacher_code,
+         tt.id AS tt_id, tt.tag_uid AS tt_tag_uid, tt.assigned_at AS tt_assigned_at
+       FROM teachers t
+       LEFT JOIN teacher_tags tt ON tt.teacher_id = t.id
+       ORDER BY t.name ASC`
+    );
 
-    if (error) throw error;
+    const teachers = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      department: r.department,
+      teacher_code: r.teacher_code,
+      teacher_tags:
+        r.tt_id !== null
+          ? { id: r.tt_id, tag_uid: r.tt_tag_uid, assigned_at: r.tt_assigned_at }
+          : null,
+    }));
 
-    return res.json({ ok: true, teachers: data });
+    return res.json({ ok: true, teachers });
   } catch (err) {
     console.error("Admin list teacher-tags error:", err.message);
     return res.status(500).json({
@@ -48,59 +77,56 @@ router.post("/teacher-tags", async (req, res) => {
     return res.status(400).json({ ok: false, message: "กรุณาเลือกครูและกรอกเลขแท็ก" });
   }
 
+  const cleanTagUid = tagUid.trim();
+
   try {
-    const { data: teacherExists, error: teacherFindError } = await supabase
-      .from("teachers")
-      .select("id")
-      .eq("id", teacherId)
-      .maybeSingle();
+    const [teacherRows] = await query("SELECT id FROM teachers WHERE id = ?", [teacherId]);
 
-    if (teacherFindError) throw teacherFindError;
-
-    if (!teacherExists) {
+    if (teacherRows.length === 0) {
       return res.status(404).json({ ok: false, message: "ไม่พบครูคนนี้" });
     }
 
-    const { data: existingForTeacher, error: findByTeacherError } = await supabase
-      .from("teacher_tags")
-      .select("id")
-      .eq("teacher_id", teacherId)
-      .maybeSingle();
+    const [existingForTeacherRows] = await query(
+      "SELECT id FROM teacher_tags WHERE teacher_id = ?",
+      [teacherId]
+    );
 
-    if (findByTeacherError) throw findByTeacherError;
-
-    if (existingForTeacher) {
+    if (existingForTeacherRows.length > 0) {
       return res.status(409).json({
         ok: false,
         message: "ครูคนนี้มีแท็กอยู่แล้ว ถ้าต้องการเปลี่ยนเลขแท็ก กรุณาใช้ปุ่มแก้ไขแทน",
       });
     }
 
-    const { data: existingForTag, error: findByTagError } = await supabase
-      .from("teacher_tags")
-      .select("id")
-      .eq("tag_uid", tagUid.trim())
-      .maybeSingle();
+    const [existingForTagRows] = await query(
+      "SELECT id FROM teacher_tags WHERE tag_uid = ?",
+      [cleanTagUid]
+    );
 
-    if (findByTagError) throw findByTagError;
-
-    if (existingForTag) {
+    if (existingForTagRows.length > 0) {
       return res.status(409).json({
         ok: false,
         message: "เลขแท็กนี้ถูกผูกกับครูคนอื่นไปแล้ว",
       });
     }
 
-    const { data: created, error: insertError } = await supabase
-      .from("teacher_tags")
-      .insert({ teacher_id: teacherId, tag_uid: tagUid.trim() })
-      .select()
-      .single();
+    const [insertResult] = await query(
+      "INSERT INTO teacher_tags (teacher_id, tag_uid) VALUES (?, ?)",
+      [teacherId, cleanTagUid]
+    );
 
-    if (insertError) throw insertError;
+    const [createdRows] = await query("SELECT * FROM teacher_tags WHERE id = ?", [
+      insertResult.insertId,
+    ]);
 
-    return res.json({ ok: true, teacherTag: created });
+    return res.json({ ok: true, teacherTag: createdRows[0] });
   } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      return res.status(409).json({
+        ok: false,
+        message: "เลขแท็กนี้ถูกผูกกับครูคนอื่นไปแล้ว",
+      });
+    }
     console.error("Admin assign teacher tag error:", err.message);
     return res.status(500).json({
       ok: false,
@@ -131,31 +157,35 @@ router.patch("/teachers/:id", async (req, res) => {
     return res.status(400).json({ ok: false, message: "กรุณากรอกชื่อ-นามสกุล" });
   }
 
-  const updatePayload = {};
-  if (name !== undefined) updatePayload.name = name.trim();
+  const updateFields = [];
+  const updateValues = [];
+
+  if (name !== undefined) {
+    updateFields.push("name = ?");
+    updateValues.push(name.trim());
+  }
   if (department !== undefined) {
-    updatePayload.department = department && department.trim() ? department.trim() : null;
+    updateFields.push("department = ?");
+    updateValues.push(department && department.trim() ? department.trim() : null);
   }
 
-  if (Object.keys(updatePayload).length === 0) {
+  if (updateFields.length === 0) {
     return res.status(400).json({ ok: false, message: "ไม่มีข้อมูลให้แก้ไข" });
   }
 
   try {
-    const { data: updated, error: updateError } = await supabase
-      .from("teachers")
-      .update(updatePayload)
-      .eq("id", id)
-      .select()
-      .maybeSingle();
+    const [updateResult] = await query(
+      `UPDATE teachers SET ${updateFields.join(", ")} WHERE id = ?`,
+      [...updateValues, id]
+    );
 
-    if (updateError) throw updateError;
-
-    if (!updated) {
+    if (updateResult.affectedRows === 0) {
       return res.status(404).json({ ok: false, message: "ไม่พบครูคนนี้" });
     }
 
-    return res.json({ ok: true, teacher: updated });
+    const [updatedRows] = await query("SELECT * FROM teachers WHERE id = ?", [id]);
+
+    return res.json({ ok: true, teacher: updatedRows[0] });
   } catch (err) {
     console.error("Admin update teacher error:", err.message);
     return res.status(500).json({
@@ -178,41 +208,45 @@ router.patch("/teacher-tags/:teacherId", async (req, res) => {
     return res.status(400).json({ ok: false, message: "กรุณากรอกเลขแท็กใหม่" });
   }
 
+  const cleanTagUid = tagUid.trim();
+
   try {
-    const { data: existingForTag, error: findByTagError } = await supabase
-      .from("teacher_tags")
-      .select("id")
-      .eq("tag_uid", tagUid.trim())
-      .neq("teacher_id", teacherId)
-      .maybeSingle();
+    const [existingForTagRows] = await query(
+      "SELECT id FROM teacher_tags WHERE tag_uid = ? AND teacher_id != ?",
+      [cleanTagUid, teacherId]
+    );
 
-    if (findByTagError) throw findByTagError;
-
-    if (existingForTag) {
+    if (existingForTagRows.length > 0) {
       return res.status(409).json({
         ok: false,
         message: "เลขแท็กนี้ถูกผูกกับครูคนอื่นไปแล้ว",
       });
     }
 
-    const { data: updated, error: updateError } = await supabase
-      .from("teacher_tags")
-      .update({ tag_uid: tagUid.trim() })
-      .eq("teacher_id", teacherId)
-      .select()
-      .single();
+    const [updateResult] = await query(
+      "UPDATE teacher_tags SET tag_uid = ? WHERE teacher_id = ?",
+      [cleanTagUid, teacherId]
+    );
 
-    if (updateError) throw updateError;
-
-    if (!updated) {
+    if (updateResult.affectedRows === 0) {
       return res.status(404).json({
         ok: false,
         message: "ครูคนนี้ยังไม่มีแท็ก กรุณาใช้ปุ่มเพิ่มแท็กแทน",
       });
     }
 
-    return res.json({ ok: true, teacherTag: updated });
+    const [updatedRows] = await query("SELECT * FROM teacher_tags WHERE teacher_id = ?", [
+      teacherId,
+    ]);
+
+    return res.json({ ok: true, teacherTag: updatedRows[0] });
   } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      return res.status(409).json({
+        ok: false,
+        message: "เลขแท็กนี้ถูกผูกกับครูคนอื่นไปแล้ว",
+      });
+    }
     console.error("Admin update teacher tag error:", err.message);
     return res.status(500).json({
       ok: false,
@@ -229,12 +263,7 @@ router.delete("/teacher-tags/:teacherId", async (req, res) => {
   const { teacherId } = req.params;
 
   try {
-    const { error } = await supabase
-      .from("teacher_tags")
-      .delete()
-      .eq("teacher_id", teacherId);
-
-    if (error) throw error;
+    await query("DELETE FROM teacher_tags WHERE teacher_id = ?", [teacherId]);
 
     return res.json({ ok: true });
   } catch (err) {
