@@ -1,0 +1,59 @@
+# -----------------------------------------------------------------
+# .env.example — คัดลอกเป็น .env แล้วกรอกค่าจริงของเครื่องตัวเอง
+# ห้ามคอมมิต .env ตัวจริงเข้า git เด็ดขาด (ตรวจ .gitignore ว่ามี .env อยู่)
+#
+# ไฟล์นี้อัปเดตตามโค้ดจริงล่าสุด (config/mysql-pool.js, config/db.js,
+# bridge-server.js, config/db-bridge-client.js) — ตัวแปรที่เพิ่มเข้ามา
+# ใหม่เทียบกับเวอร์ชันก่อนหน้า: DB_PORT, DB_MODE, BRIDGE_PORT,
+# BRIDGE_AUTH_KEY, DB_BRIDGE_URL, DB_BRIDGE_KEY (ดู README section 11)
+# -----------------------------------------------------------------
+
+# ---- MySQL / MariaDB (XAMPP) ----
+# ค่า default ของ XAMPP ทั่วไปคือ host=localhost, user=root, password=""
+# (ว่าง) — แต่ทดสอบจริงแล้วพบว่า root@localhost ของ XAMPP มักต่อผ่าน TCP
+# ไม่ได้เลย (mysql2 ต่อผ่าน TCP เสมอ) ต้องสร้าง user แยกที่มี password
+# จริงและ host เป็น '%' ก่อนใช้งานจริง — ดู README section 12.3
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=key_borrow_db
+DB_PORT=3306
+
+# ---- โหมดการเชื่อมต่อฐานข้อมูล (config/db.js) ----
+# local  = คุย MySQL ตรงผ่าน mysql2 (ใช้ตอน dev บนเครื่อง local เดียวกับ
+#          XAMPP หรือรันจริงบนเครื่องเดียวกันเลย) — ค่า default ถ้าไม่ตั้ง
+# bridge = ยิง HTTP ไปหา bridge-server.js แทน (ใช้ตอนรันบน Render) —
+#          ต้องตั้ง DB_BRIDGE_URL และ DB_BRIDGE_KEY ด้านล่างด้วยเสมอ
+# ดู README section 11
+DB_MODE=local
+
+# ---- Bridge (เฉพาะเครื่องที่รัน bridge-server.js คู่กับ XAMPP) ----
+# BRIDGE_PORT: พอร์ตที่ bridge-server.js เปิดรับ (ต่างจากพอร์ตเว็บหลัก
+#   server.js เสมอ กันชนกัน) ถ้าไม่ตั้งจะใช้ 4001
+# BRIDGE_AUTH_KEY: คีย์ลับกันคนแปลกหน้ายิง SQL เข้ามา — ต้องตั้งเสมอ
+#   ไม่มีค่า default (bridge-server.js จะไม่ยอมสตาร์ทถ้าไม่ตั้ง) สุ่มด้วย
+#   เช่น `openssl rand -hex 32`
+BRIDGE_PORT=4001
+BRIDGE_AUTH_KEY=
+
+# ---- Bridge client (เฉพาะฝั่งที่รันบน Render ใน DB_MODE=bridge) ----
+# DB_BRIDGE_URL: URL ของ bridge-server.js ผ่าน Cloudflare Tunnel เช่น
+#   https://xxxxx.trycloudflare.com (ได้ URL ใหม่ทุกครั้งที่เปิด Quick
+#   Tunnel ใหม่ ต้องมาแก้ค่านี้บน Render ทุกรอบ — ดู FOR_ME.md ข้อ 7)
+# DB_BRIDGE_KEY: ต้องตรงกับ BRIDGE_AUTH_KEY ด้านบนเป๊ะ (เครื่องเดียวกัน
+#   ที่รัน bridge-server.js)
+DB_BRIDGE_URL=
+DB_BRIDGE_KEY=
+
+# ---- แอดมิน login (เปลี่ยนจากค่า default นี้ก่อนใช้งานจริงเสมอ) ----
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin@1234
+
+# ---- JWT ----
+# JWT_SECRET: สุ่มมาให้ใหม่แล้ว (openssl rand -hex 32) ใช้ได้เลย หรือจะ
+#   สุ่มใหม่เองก็ได้ด้วยคำสั่งเดียวกัน — ห้ามใช้ค่านี้ตรงๆ ใน production
+JWT_SECRET=f45b8af83253375b10ed286f5bc59075ee7e944b02e36a509580c868ffc15791
+JWT_EXPIRES_IN=7d
+
+# ---- เว็บหลัก ----
+PORT=3000

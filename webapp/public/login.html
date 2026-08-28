@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="/css/teacher.css" />
 </head>
 <body>
 
@@ -43,7 +44,7 @@
           </li>
         </ol>
 
-        <a href="/teacher.html" class="status-link">ดูสถานะกุญแจทั้งหมด &rarr;</a>
+        <a href="#keys-status" class="status-link">ดูสถานะกุญแจทั้งหมด &rarr;</a>
 
         <div class="brand-footer">
           <span class="stamp">TEST&nbsp;BUILD</span>
@@ -124,8 +125,10 @@
         <!-- ปุ่ม "ดูสถานะกุญแจทั้งหมด" ตัวจริงอยู่ใน .brand-panel ซึ่งถูก
              display:none ทิ้งทั้งก้อนบนจอแคบ (ดู style.css @media max-width:860px)
              เลยต้องมีตัวสำรองไว้ในการ์ดฟอร์มสำหรับ mobile โดยเฉพาะ ไม่งั้น
-             ไม่มีทางกดไปหน้า teacher.html ได้เลยบนมือถือ -->
-        <a href="/teacher.html" class="status-link status-link--mobile-only">ดูสถานะกุญแจทั้งหมด &rarr;</a>
+             ไม่มีทางเลื่อนไปดูส่วนสถานะกุญแจได้เลยบนมือถือ — ทั้งสองปุ่ม
+             เป็น anchor ไปยัง #keys-status ในหน้านี้เอง (ไม่ใช่หน้าแยก
+             /teacher.html อีกต่อไป ดู README ข้อ 10.1) -->
+        <a href="#keys-status" class="status-link status-link--mobile-only">ดูสถานะกุญแจทั้งหมด &rarr;</a>
 
         <div class="pass-footer pass-footer--mobile-only">
           <span class="stamp">TEST&nbsp;BUILD</span>
@@ -136,6 +139,82 @@
     </div>
   </div>
 
+  <!-- =================================================================
+       ============== ดูสถานะกุญแจทั้งหมด (public, ไม่ต้อง login) ==============
+       -----------------------------------------------------------------
+       เดิมเป็นหน้าแยก /teacher.html — ยุบเข้ามารวมในหน้านี้ตาม README
+       ข้อ 10.1 ("ดูสถานะกุญแจโดยรวมแบบสาธารณะ ... จะถูกยุบเข้ามารวม
+       ไม่แยกหน้าแล้ว") ปุ่ม "ดูสถานะกุญแจทั้งหมด" ด้านบน (ทั้งเวอร์ชัน
+       desktop ใน .brand-panel และเวอร์ชัน mobile ใน .pass-card) เป็น
+       anchor ลิงก์มาที่ #keys-status นี้ตรงๆ
+
+       โครง HTML ก้อนนี้ทั้งหมด (filter-row, items-grid, room modal)
+       ยกมาจาก teacher.html เดิมเป๊ะๆ ไม่มีการแก้ id/class ใดๆ เพราะ
+       teacher.js (โหลดไว้ท้ายไฟล์นี้แล้ว ไม่แก้โค้ดข้างในเลย) ผูกกับ
+       id พวกนี้ตรงๆ: #items-grid, #search-input, #status-filter,
+       #room-modal-overlay/#room-modal-body/#room-modal-close, #toast
+       — ตัด <header class="teacher-topbar"> เดิมออก เพราะหน้านี้มี
+       header/branding ของตัวเองอยู่แล้วด้านบน (.brand-panel) ไม่ต้องมี
+       ซ้ำสอง header ในหน้าเดียว ใช้ .teacher-main ธรรมดาห่อเนื้อหาแทน
+       ============== ==============
+       ================================================================= -->
+  <div class="teacher-shell" id="keys-status">
+    <main class="teacher-main">
+
+      <section>
+        <h2 class="teacher-section-title">วิธีใช้งาน</h2>
+        <p class="teacher-section-sub">
+          ครูแตะบัตรประจำตัวที่เครื่องอ่านหน้าห้องทะเบียนก่อน แล้วแตะแท็กกุญแจที่ต้องการยืมหรือคืน
+          ระบบจะบันทึกให้ทันที หน้านี้เป็นหน้าสาธารณะสำหรับดูสถานะปัจจุบันเท่านั้น ไม่ใช้ยืม-คืนผ่านเว็บ
+          และไม่ต้องเข้าสู่ระบบ
+        </p>
+      </section>
+
+      <!-- ============== สถานะกุญแจทั้งหมด ============== -->
+      <section>
+        <h2 class="teacher-section-title">สถานะกุญแจทั้งหมด</h2>
+        <p class="teacher-section-sub">ดูว่ากุญแจดอกไหนว่าง ดอกไหนถูกยืมอยู่ และยืมอยู่โดยใคร</p>
+
+        <div class="filter-row">
+          <label for="search-input">ค้นหา</label>
+          <input type="text" id="search-input" placeholder="ค้นหาชื่อห้อง/กุญแจ..." />
+
+          <label for="status-filter">สถานะ</label>
+          <select id="status-filter">
+            <option value="">ทั้งหมด</option>
+            <option value="available">ว่าง</option>
+            <option value="borrowed">ถูกยืมอยู่</option>
+          </select>
+        </div>
+
+        <div id="items-grid" class="items-grid">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="teacher-toast" role="status" aria-live="polite"></div>
+
+  <!-- ============== Room detail modal (Task 9a/10) ==============
+       ซ่อนไว้ด้วย display:none ใน CSS เป็นค่าเริ่มต้นเสมอ (.room-modal-overlay
+       ไม่มี .is-visible) — JS เป็นคนเติม/ถอด class เดียวกับรูปแบบที่
+       admin.css ใช้กับ .confirm-overlay อยู่แล้ว เพื่อให้ pattern เปิด/ปิด
+       modal เหมือนกันทั้งระบบ ไม่ต้องคิดใหม่
+       โครงสร้างภายในถูกเติมด้วย JS ทั้งหมด (renderRoomDetail) เพราะ
+       เนื้อหาเปลี่ยนไปตามห้องที่คลิก — ไฟล์นี้มีแค่ overlay/card/ปุ่มปิด
+       เป็นเปลือกคงที่ -->
+  <div id="room-modal-overlay" class="room-modal-overlay">
+    <div class="room-modal-card" role="dialog" aria-modal="true" aria-labelledby="room-modal-title">
+      <button type="button" id="room-modal-close" class="room-modal-close" aria-label="ปิด">&times;</button>
+      <div id="room-modal-body" class="room-modal-body">
+        <!-- เติมด้วย JS: renderRoomDetail() -->
+      </div>
+    </div>
+  </div>
+
 <script src="/js/login.js"></script>
+<script src="/js/teacher.js"></script>
 </body>
 </html>

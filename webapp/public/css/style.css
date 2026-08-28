@@ -5,7 +5,7 @@
      --ink        #1C2128   พื้นหลังหลัก โทนกราไฟต์เข้ม
      --panel      #262B33   พื้นการ์ด
      --panel-2    #2E343D   พื้นช่อง input
-     --teal       #3E9C8F   accent หลัก (นักเรียน/แท็ก/สแกน)
+     --teal       #3E9C8F   accent หลัก (สมัครครู/แท็ก/สแกน)
      --amber      #E8A33D   accent แอดมิน
      --violet     #8B7FD1   accent ครู
      --ink-line   #3A4048   เส้นแบ่ง/ขอบ
@@ -222,7 +222,7 @@ html, body {
   letter-spacing: -0.01em;
 }
 
-/* --- แท็บเลือกบทบาท (นักเรียน / ครู / แอดมิน) --- */
+/* --- แท็บเลือกบทบาท (สมัครครูใหม่ / แอดมิน) --- */
 .role-row {
   display: flex;
   background: var(--panel-2);
@@ -247,7 +247,6 @@ html, body {
 }
 
 .role-btn.is-active { color: #0F1418; }
-.role-btn[data-role="student"].is-active { background: var(--teal); }
 .role-btn[data-role="teacher"].is-active { background: var(--violet); }
 .role-btn[data-role="admin"].is-active { background: var(--amber); }
 
@@ -360,7 +359,6 @@ html, body {
 
 .mode-btn.is-active { color: var(--text-hi); }
 
-[data-role-panel="student"] .mode-btn.is-active::after { background: var(--teal); }
 [data-role-panel="teacher"] .mode-btn.is-active::after { background: var(--violet); }
 
 /* --- ฟอร์ม --- */

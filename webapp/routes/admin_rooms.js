@@ -29,7 +29,13 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const router = express.Router();
-const { pool } = require("../config/db");
+// [Fix] เดิม const { pool } ใช้ pool.query()/pool.getConnection() ตรงๆ
+// ทั่วทั้งไฟล์ — ใช้ได้เฉพาะ DB_MODE=local เพราะโหมด bridge
+// (db-bridge-client.js) export pool: null เสมอ (ไม่มี raw pool ให้ใช้
+// ตรงๆ ในสถาปัตยกรรม HTTP bridge) เปลี่ยนมาใช้ query()/withTransaction()
+// แทนทุกจุด ให้ตรง pattern เดียวกับไฟล์ route อื่นทั้งหมด
+// (tap.js, keys.js, admin_keys.js, admin_teachers.js, export.js)
+const { query, withTransaction } = require("../config/db");
 
 // -------------------------------------------------------------
 // โฟลเดอร์ปลายทางของรูปห้อง — สร้างไว้ล่วงหน้าตอนโหลดไฟล์นี้ กัน
@@ -185,7 +191,7 @@ function serializeRoomPayload(payload) {
 // -------------------------------------------------------------
 router.get("/rooms", async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await query(
       `SELECT * FROM room_tags ORDER BY room_name ASC`
     );
 
@@ -224,7 +230,7 @@ router.post("/rooms", async (req, res) => {
     // ถ้ามีการกรอก tagUid มา เช็คซ้ำก่อน (เพราะ unique constraint จะ error
     // แบบไม่ friendly ถ้าไม่เช็คเอง)
     if (tagUid && tagUid.trim()) {
-      const [existingRows] = await pool.query(
+      const [existingRows] = await query(
         `SELECT id FROM room_tags WHERE tag_uid = ? LIMIT 1`,
         [tagUid.trim()]
       );
@@ -248,12 +254,12 @@ router.post("/rooms", async (req, res) => {
     const placeholders = columns.map(() => "?").join(", ");
     const values = columns.map((col) => payload[col]);
 
-    const [insertResult] = await pool.query(
+    const [insertResult] = await query(
       `INSERT INTO room_tags (${columns.join(", ")}) VALUES (${placeholders})`,
       values
     );
 
-    const [createdRows] = await pool.query(
+    const [createdRows] = await query(
       `SELECT * FROM room_tags WHERE id = ?`,
       [insertResult.insertId]
     );
@@ -297,7 +303,7 @@ router.patch("/rooms/:id", async (req, res) => {
 
   try {
     if (updatePayload.tag_uid) {
-      const [existingRows] = await pool.query(
+      const [existingRows] = await query(
         `SELECT id FROM room_tags WHERE tag_uid = ? AND id != ? LIMIT 1`,
         [updatePayload.tag_uid, id]
       );
@@ -315,7 +321,7 @@ router.patch("/rooms/:id", async (req, res) => {
     const setSql = columns.map((col) => `${col} = ?`).join(", ");
     const values = columns.map((col) => payload[col]);
 
-    const [updateResult] = await pool.query(
+    const [updateResult] = await query(
       `UPDATE room_tags SET ${setSql} WHERE id = ?`,
       [...values, id]
     );
@@ -324,7 +330,7 @@ router.patch("/rooms/:id", async (req, res) => {
       return res.status(404).json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
     }
 
-    const [updatedRows] = await pool.query(`SELECT * FROM room_tags WHERE id = ?`, [id]);
+    const [updatedRows] = await query(`SELECT * FROM room_tags WHERE id = ?`, [id]);
 
     return res.json({ ok: true, room: updatedRows[0] });
   } catch (err) {
@@ -355,7 +361,7 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
 
   try {
     // เช็คก่อนว่าห้องนี้มีจริง กัน orphan ไฟล์บนดิสก์ถ้า id ผิด
-    const [roomRows] = await pool.query(
+    const [roomRows] = await query(
       `SELECT id, image_url FROM room_tags WHERE id = ? LIMIT 1`,
       [id]
     );
@@ -375,7 +381,7 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
     const room = roomRows[0];
     const imageUrl = `/uploads/room-images/${req.file.filename}`;
 
-    const [updateResult] = await pool.query(
+    const [updateResult] = await query(
       `UPDATE room_tags SET image_url = ? WHERE id = ?`,
       [imageUrl, id]
     );
@@ -384,7 +390,7 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
       return res.status(404).json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
     }
 
-    const [updatedRows] = await pool.query(`SELECT * FROM room_tags WHERE id = ?`, [id]);
+    const [updatedRows] = await query(`SELECT * FROM room_tags WHERE id = ?`, [id]);
 
     // ลบรูปเก่าทิ้งถ้ามี (best-effort — ไม่ throw ถ้าลบไม่สำเร็จ เพราะ
     // รูปใหม่บันทึกสำเร็จไปแล้ว ไม่อยากให้ request ทั้งเส้นล้มเพราะเรื่องนี้)
@@ -453,7 +459,7 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
 
   try {
     // เช็คก่อนว่าห้องนี้มีจริง กัน orphan ไฟล์บนดิสก์ถ้า id ผิด
-    const [roomRows] = await pool.query(
+    const [roomRows] = await query(
       `SELECT id FROM room_tags WHERE id = ? LIMIT 1`,
       [id]
     );
@@ -464,7 +470,7 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
     }
 
     // หา sort_order สูงสุดปัจจุบันของห้องนี้ เพื่อต่อท้ายลำดับเดิม
-    const [maxRows] = await pool.query(
+    const [maxRows] = await query(
       `SELECT sort_order FROM room_images WHERE room_tag_id = ? ORDER BY sort_order DESC LIMIT 1`,
       [id]
     );
@@ -481,45 +487,48 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
       return row;
     });
 
-    // [MySQL] transaction จริง (ข้อ 9 MANIFEST) — insert หลายแถวพร้อมกัน
-    // ด้วยคำสั่งเดียว (multi-row INSERT) ถ้าล้มเหลว rollback + ลบไฟล์
-    // ที่เขียนลงดิสก์ไปแล้วทั้งหมดทิ้ง (แทนการ remove จาก Supabase
-    // Storage ของเดิม)
-    const conn = await pool.getConnection();
+    // [Fix] เดิมใช้ pool.getConnection() + beginTransaction/commit/
+    // rollback/release ด้วยมือ — พังในโหมด DB_MODE=bridge เพราะไม่มี
+    // raw pool ให้ขอ connection ตรงๆ เปลี่ยนมาใช้ withTransaction()
+    // แทน ซึ่งจัดการ begin/commit/rollback/release ให้อัตโนมัติ และ
+    // ทำงานได้ทั้งสองโหมด (local ใช้ mysql2 connection จริง, bridge
+    // ใช้ fake connection ที่ยิง HTTP ไปหา bridge-server.js — หน้าตา
+    // การเรียกใช้เหมือนกันทุกจุดตามที่ config/db.js ออกแบบไว้)
+    //
+    // [MySQL] insert หลายแถวพร้อมกันด้วยคำสั่งเดียว (multi-row INSERT)
+    // ถ้าล้มเหลว withTransaction จะ rollback ให้เอง — cleanupUploadedFiles()
+    // ยังต้องเรียกเองตรงนี้เพราะเป็นการลบไฟล์บนดิสก์ ไม่ใช่ส่วนของ DB
+    // transaction (withTransaction ไม่รู้จักไฟล์บนดิสก์)
     let createdRows;
     try {
-      await conn.beginTransaction();
+      createdRows = await withTransaction(async (conn) => {
+        const values = insertedRows.map((row) => [row.room_tag_id, row.image_url, row.sort_order]);
+        await conn.query(
+          `INSERT INTO room_images (room_tag_id, image_url, sort_order) VALUES ?`,
+          [values]
+        );
 
-      const values = insertedRows.map((row) => [row.room_tag_id, row.image_url, row.sort_order]);
-      await conn.query(
-        `INSERT INTO room_images (room_tag_id, image_url, sort_order) VALUES ?`,
-        [values]
-      );
-
-      // ไม่ใช้ insertResult.insertId + index ไล่เลขเดา id แถวที่เพิ่ง
-      // insert (สมมติว่า auto_increment ออกเลขต่อเนื่องเป๊ะ) เพราะแม้
-      // ปกติ InnoDB จะทำแบบนั้นกับ bulk insert แถวเดียวติดกัน แต่เป็น
-      // สมมติฐานที่พังได้เงียบๆ ถ้ามีปัจจัยอื่นแทรก — ดึงกลับด้วย
-      // room_tag_id ตรงๆ แทน ปลอดภัยกว่าและยังอยู่ใน transaction เดียวกัน
-      // (เผื่อห้องนี้มีรูปเก่าอยู่ก่อนแล้ว กรองด้วย image_url ที่เพิ่ง
-      // insert ไปด้วย กันดึงรูปเก่าปนมา)
-      const newImageUrls = insertedRows.map((row) => row.image_url);
-      const [rows] = await conn.query(
-        `SELECT * FROM room_images WHERE room_tag_id = ? AND image_url IN (?) ORDER BY sort_order ASC`,
-        [id, newImageUrls]
-      );
-      createdRows = rows;
-
-      await conn.commit();
+        // ไม่ใช้ insertResult.insertId + index ไล่เลขเดา id แถวที่เพิ่ง
+        // insert (สมมติว่า auto_increment ออกเลขต่อเนื่องเป๊ะ) เพราะแม้
+        // ปกติ InnoDB จะทำแบบนั้นกับ bulk insert แถวเดียวติดกัน แต่เป็น
+        // สมมติฐานที่พังได้เงียบๆ ถ้ามีปัจจัยอื่นแทรก — ดึงกลับด้วย
+        // room_tag_id ตรงๆ แทน ปลอดภัยกว่าและยังอยู่ใน transaction เดียวกัน
+        // (เผื่อห้องนี้มีรูปเก่าอยู่ก่อนแล้ว กรองด้วย image_url ที่เพิ่ง
+        // insert ไปด้วย กันดึงรูปเก่าปนมา)
+        const newImageUrls = insertedRows.map((row) => row.image_url);
+        const [rows] = await conn.query(
+          `SELECT * FROM room_images WHERE room_tag_id = ? AND image_url IN (?) ORDER BY sort_order ASC`,
+          [id, newImageUrls]
+        );
+        return rows;
+      });
     } catch (insertError) {
-      await conn.rollback();
-      // insert ลง DB ล้มเหลวหลังเขียนไฟล์ลงดิสก์สำเร็จไปแล้ว — ลบไฟล์ที่
-      // เพิ่งเขียนทั้งหมดทิ้ง (best-effort) กัน orphan ไฟล์ค้างบนดิสก์
+      // insert ลง DB ล้มเหลวหลังเขียนไฟล์ลงดิสก์สำเร็จไปแล้ว (withTransaction
+      // rollback ฝั่ง DB ให้เรียบร้อยแล้วก่อน throw กลับมาที่นี่) — ลบไฟล์
+      // ที่เพิ่งเขียนทั้งหมดทิ้ง (best-effort) กัน orphan ไฟล์ค้างบนดิสก์
       // โดยไม่มี record อ้างอิงเลย
       cleanupUploadedFiles();
       throw insertError;
-    } finally {
-      conn.release();
     }
 
     return res.json({ ok: true, images: createdRows });
@@ -542,7 +551,7 @@ router.delete("/rooms/:id/images/:imageId", async (req, res) => {
   const { id, imageId } = req.params;
 
   try {
-    const [imageRows] = await pool.query(
+    const [imageRows] = await query(
       `SELECT id, image_url FROM room_images WHERE id = ? AND room_tag_id = ? LIMIT 1`,
       [imageId, id]
     );
@@ -553,7 +562,7 @@ router.delete("/rooms/:id/images/:imageId", async (req, res) => {
 
     const image = imageRows[0];
 
-    await pool.query(`DELETE FROM room_images WHERE id = ?`, [imageId]);
+    await query(`DELETE FROM room_images WHERE id = ?`, [imageId]);
 
     // ลบไฟล์จริงออกจากดิสก์ด้วย (best-effort — record ใน DB ลบไปแล้ว
     // สำเร็จ ไม่อยากให้ request ทั้งเส้นล้มเพราะลบไฟล์บนดิสก์ไม่ผ่าน)
@@ -611,7 +620,7 @@ router.patch("/rooms/:id/images/reorder", async (req, res) => {
   try {
     // ดึงรูปทั้งหมดที่มีอยู่จริงของห้องนี้มาเทียบ — ต้องตรงกับ order เป๊ะ
     // ทั้งจำนวนและตัวตน (set เดียวกัน) ไม่งั้นถือว่า request ไม่ถูกต้อง
-    const [existingImages] = await pool.query(
+    const [existingImages] = await query(
       `SELECT id FROM room_images WHERE room_tag_id = ?`,
       [id]
     );
@@ -639,12 +648,12 @@ router.patch("/rooms/:id/images/reorder", async (req, res) => {
     // pool ถูกใช้พร้อมกันเยอะโดยไม่จำเป็น)
     const updatedRows = [];
     for (let index = 0; index < orderIds.length; index += 1) {
-      await pool.query(`UPDATE room_images SET sort_order = ? WHERE id = ?`, [
+      await query(`UPDATE room_images SET sort_order = ? WHERE id = ?`, [
         index,
         orderIds[index],
       ]);
 
-      const [rows] = await pool.query(`SELECT * FROM room_images WHERE id = ?`, [orderIds[index]]);
+      const [rows] = await query(`SELECT * FROM room_images WHERE id = ?`, [orderIds[index]]);
       updatedRows.push(rows[0]);
     }
 
@@ -672,7 +681,7 @@ router.delete("/rooms/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    await pool.query(`DELETE FROM room_tags WHERE id = ?`, [id]);
+    await query(`DELETE FROM room_tags WHERE id = ?`, [id]);
 
     return res.json({ ok: true });
   } catch (err) {
