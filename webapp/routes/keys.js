@@ -1,29 +1,16 @@
 // routes/keys.js
 // -----------------------------------------------------------------
-// มุมมอง read-only แบบสาธารณะ (ไม่มี login สำหรับครูอีกต่อไปตาม
-// สถาปัตยกรรมใหม่ — ดู README ข้อ 10):
-//   - ดูสถานะกุญแจทั้งหมด (ใครก็เข้าดูได้ ไม่ต้อง login)
+// มุมมอง read-only แบบสาธารณะ (ไม่ต้อง login)
+// - ดูสถานะกุญแจทั้งหมด
+// - ดูประวัติยืม-คืน
 //
-// *** เปลี่ยนใหญ่: ตัด GET /keys/history/mine ออก *** เดิม endpoint นี้
-// อ้างอิง req.user.id เพื่อกรองประวัติ "ของตัวเอง" แต่ตอนนี้ไม่มีครูที่
-// login ผ่านเว็บแล้ว จึงไม่มี "ตัวเอง" ให้อ้างอิง — ถ้าต้องการดูประวัติ
-// รายคนในอนาคต ให้ทำเป็นหน้าแอดมิน (ผ่าน admin_keys.js ที่มีอยู่แล้ว)
-// แทน ไม่ใช่หน้าสาธารณะ
-//
-// Auth: mount แบบ public ใน server.js (ไม่ผ่าน requireAuth)
-//
-// *** ย้ายจาก Supabase -> MySQL (XAMPP) ***
-// แก้เฉพาะชั้นที่คุยกับฐานข้อมูล — endpoint path, response shape,
-// เงื่อนไข business logic เหมือนเดิมทุกจุด (ดู MANIFEST)
+// Auth: public routes (ไม่มี requireAuth)
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
-const { query } = require("../config/db");
+const pool = require("../config/db");
 
-// mysql2 ไม่ auto-parse คอลัมน์ type JSON ให้เป็น JS array เสมอไป (ขึ้นกับ
-// เวอร์ชัน/การตั้งค่า) — กันไว้ทั้งสองแบบเหมือนที่ทำใน tap.js (MANIFEST
-// ข้อ 1) ถ้าเจอ string ให้ parse, ถ้า driver parse มาให้แล้วก็ใช้ตรงๆ
 function parseBorrowWindowDays(value) {
   if (value === null || value === undefined) return null;
   if (typeof value === "string") {
@@ -36,21 +23,17 @@ function parseBorrowWindowDays(value) {
   return value;
 }
 
-// -------------------------------------------------------------
+// -----------------------------------------------------------------
 // GET /api/keys/status
-// สถานะปัจจุบันของกุญแจทุกดอก (ว่าง/ถูกยืม + ใครยืมอยู่)
-//
-// ของเดิมใช้ PostgREST embed ดึง borrowed_by (1:1 ผ่าน FK) และ
-// room_images (1:many ผ่าน FK) มาในคำสั่งเดียว — MySQL ไม่มี embed
-// แบบนี้ เลยแยกเป็น 2 query: (1) ห้องทั้งหมด + LEFT JOIN teachers
-// สำหรับ borrowed_by (ยัง 1:1 join ตรงๆ ได้ปกติ) (2) รูปทั้งหมดของ
-// ห้องที่ดึงมาในรอบแรก ด้วย WHERE room_tag_id IN (...) แล้ว group
-// เข้าด้วยกันในโค้ด JS — ตรงตาม MANIFEST ข้อ 4 (ห้ามลืม sort ตาม
-// sort_order ตอน group)
-// -------------------------------------------------------------
+// สถานะกุญแจทั้งหมด (ว่าง/ถูกย��ม + ใครยืมอยู่ + รูปภาพ)
+// -----------------------------------------------------------------
 router.get("/keys/status", async (req, res) => {
+  let connection;
   try {
-    const [roomRows] = await query(
+    connection = await pool.getConnection();
+
+    // ดึงกุญแจทั้งหมด + ผู้ยืม
+    const [roomRows] = await connection.query(
       `SELECT
          rt.id, rt.room_name, rt.tag_uid, rt.description, rt.is_active,
          rt.status, rt.borrowed_at, rt.image_url,
@@ -66,7 +49,7 @@ router.get("/keys/status", async (req, res) => {
 
     let imagesByRoomId = new Map();
     if (roomIds.length > 0) {
-      const [imageRows] = await query(
+      const [imageRows] = await connection.query(
         `SELECT id, room_tag_id, image_url, sort_order
          FROM room_images
          WHERE room_tag_id IN (?)
@@ -76,7 +59,8 @@ router.get("/keys/status", async (req, res) => {
 
       imagesByRoomId = new Map();
       for (const img of imageRows) {
-        if (!imagesByRoomId.has(img.room_tag_id)) imagesByRoomId.set(img.room_tag_id, []);
+        if (!imagesByRoomId.has(img.room_tag_id))
+          imagesByRoomId.set(img.room_tag_id, []);
         imagesByRoomId.get(img.room_tag_id).push({
           id: img.id,
           image_url: img.image_url,
@@ -99,7 +83,11 @@ router.get("/keys/status", async (req, res) => {
       borrow_window_end: r.borrow_window_end,
       borrowed_by:
         r.borrower_id !== null
-          ? { id: r.borrower_id, name: r.borrower_name, department: r.borrower_department }
+          ? {
+              id: r.borrower_id,
+              name: r.borrower_name,
+              department: r.borrower_department,
+            }
           : null,
       room_images: imagesByRoomId.get(r.id) || [],
     }));
@@ -111,24 +99,20 @@ router.get("/keys/status", async (req, res) => {
       code: err.code,
       errno: err.errno,
       sqlMessage: err.sqlMessage,
-      sqlState: err.sqlState,
     });
     return res.status(500).json({
       ok: false,
       message: "ดึงสถานะกุญแจไม่สำเร็จ",
     });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
-// -------------------------------------------------------------
+// -----------------------------------------------------------------
 // GET /api/keys/:id/history
-// ประวัติยืม-คืนล่าสุดของกุญแจดอกเดียว (สำหรับ modal รายละเอียดห้อง
-// ที่ teacher.js เปิดตอนคลิกการ์ด — Task 9a) ส่งแค่ 10 รายการล่าสุด
-// + total count รวม เพื่อให้หน้าเว็บโชว์ปุ่ม "ดูทั้งหมด" ไป
-// /history.html?roomId=X ได้ถ้า count > 10 (ไม่ต้องดึงมาทั้งหมดที่นี่)
-//
-// public, ไม่มี auth — เหมือน /keys/status เดิม
-// -------------------------------------------------------------
+// ประวัติยืม-คืนของกุญแจดอกเดียว (10 รายการล่าสุด + total count)
+// -----------------------------------------------------------------
 const ROOM_HISTORY_PREVIEW_LIMIT = 10;
 
 router.get("/keys/:id/history", async (req, res) => {
@@ -136,31 +120,37 @@ router.get("/keys/:id/history", async (req, res) => {
   const roomTagId = parseInt(id, 10);
 
   if (!Number.isInteger(roomTagId)) {
-    return res.status(400).json({ ok: false, message: "รหัสห้อง/กุญแจไม่ถูกต้อง" });
+    return res
+      .status(400)
+      .json({ ok: false, message: "รหัสห้อง/กุญแจไม่ถูกต้อง" });
   }
 
+  let connection;
   try {
-    // เช็คก่อนว่าห้อง/กุญแจนี้มีอยู่จริง (แยก query จาก history เพื่อให้
-    // แยกแยะ "ห้องไม่มีอยู่" (404) ออกจาก "ห้องมีอยู่แต่ยังไม่เคยมี
-    // ประวัติเลย" (200, logs: [], totalCount: 0) ได้ชัดเจน)
-    const [roomRows] = await query("SELECT id, room_name FROM room_tags WHERE id = ?", [
-      roomTagId,
-    ]);
+    connection = await pool.getConnection();
+
+    // เช็คห้องมีอยู่ไหม
+    const [roomRows] = await connection.query(
+      "SELECT id, room_name FROM room_tags WHERE id = ?",
+      [roomTagId]
+    );
 
     if (roomRows.length === 0) {
-      return res.status(404).json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
+      return res
+        .status(404)
+        .json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
     }
     const room = roomRows[0];
 
-    // นับ total count แยกจากการดึง 10 รายการ — เทียบเท่า count: "exact",
-    // head: true ของ Supabase (แค่เอาเลขนับ ไม่ต้องดึง body)
-    const [countRows] = await query(
+    // นับ total count
+    const [countRows] = await connection.query(
       "SELECT COUNT(*) AS total FROM key_logs WHERE room_tag_id = ?",
       [roomTagId]
     );
     const totalCount = countRows[0].total;
 
-    const [logRows] = await query(
+    // ดึง 10 รายการล่าสุด
+    const [logRows] = await connection.query(
       `SELECT
          kl.id, kl.action, kl.acted_at,
          t.id AS teacher_id, t.name AS teacher_name, t.department AS teacher_department
@@ -178,7 +168,11 @@ router.get("/keys/:id/history", async (req, res) => {
       acted_at: r.acted_at,
       teachers:
         r.teacher_id !== null
-          ? { id: r.teacher_id, name: r.teacher_name, department: r.teacher_department }
+          ? {
+              id: r.teacher_id,
+              name: r.teacher_name,
+              department: r.teacher_department,
+            }
           : null,
     }));
 
@@ -194,37 +188,21 @@ router.get("/keys/:id/history", async (req, res) => {
       code: err.code,
       errno: err.errno,
       sqlMessage: err.sqlMessage,
-      sqlState: err.sqlState,
     });
     return res.status(500).json({
       ok: false,
       message: "ดึงประวัติกุญแจไม่สำเร็จ",
     });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
-// -------------------------------------------------------------
+// -----------------------------------------------------------------
 // GET /api/keys/history/all
-// query params:
-//   page   -> เลขหน้า เริ่มที่ 1 (default 1)
-//   limit  -> จำนวนต่อหน้า (default 20, สูงสุด 100)
-//   roomId -> กรองเฉพาะห้อง/กุญแจดอกนั้น (ไม่บังคับ — ใช้กับ
-//             /history.html?roomId=X ตอนกดปุ่ม "ดูทั้งหมด" จาก modal)
-//
-// ประวัติยืม-คืนของทุกห้อง แบบ public paginated — คนละ endpoint กับ
-// /api/admin/keys/history (admin_keys.js) ซึ่งต้อง login และรองรับ
-// filter หลากหลายกว่า (teacherId, action) หน้านี้ตั้งใจให้เรียบง่าย
-// กว่าเพราะเป็นหน้า public ที่ใครก็เข้าดูได้ — ไม่มี filter เพิ่มเติม
-// นอกจาก roomId ตาม scope ที่ล็อกไว้ใน MANIFEST
-//
-// ของเดิม { count: "exact" } + .range(from, to) ได้ count คู่กับข้อมูล
-// ใน query เดียว — MySQL แยกเป็น 2 query ชัดเจนตาม MANIFEST ข้อ 5:
-// SELECT COUNT(*) ... แล้วค่อย SELECT ... LIMIT ? OFFSET ?
-//
-// สำคัญ: response ของแถวต้องมี key ชื่อ room_tags / teachers (ไม่ใช่
-// room / teacher) เพราะ public/js/history.js ที่มีอยู่แล้วอ่านจาก
-// log.room_tags.room_name และ log.teachers.name ตรงๆ
-// -------------------------------------------------------------
+// ประวัติยืม-คืนทั้งหมด (paginated)
+// query: page, limit, roomId (optional filter)
+// -----------------------------------------------------------------
 const HISTORY_PAGE_SIZE_DEFAULT = 20;
 const HISTORY_PAGE_SIZE_MAX = 100;
 
@@ -242,21 +220,29 @@ router.get("/keys/history/all", async (req, res) => {
   if (roomId) {
     parsedRoomId = parseInt(roomId, 10);
     if (!Number.isInteger(parsedRoomId)) {
-      return res.status(400).json({ ok: false, message: "รหัสห้อง/กุญแจไม่ถูกต้อง" });
+      return res
+        .status(400)
+        .json({ ok: false, message: "รหัสห้อง/กุญแจไม่ถูกต้อง" });
     }
   }
 
+  let connection;
   try {
-    const whereClause = parsedRoomId !== null ? "WHERE kl.room_tag_id = ?" : "";
+    connection = await pool.getConnection();
+
+    const whereClause =
+      parsedRoomId !== null ? "WHERE kl.room_tag_id = ?" : "";
     const whereParams = parsedRoomId !== null ? [parsedRoomId] : [];
 
-    const [countRows] = await query(
+    // นับทั้งหมด
+    const [countRows] = await connection.query(
       `SELECT COUNT(*) AS total FROM key_logs kl ${whereClause}`,
       whereParams
     );
     const totalCount = countRows[0].total;
 
-    const [logRows] = await query(
+    // ดึงข้อมูล paginated
+    const [logRows] = await connection.query(
       `SELECT
          kl.id, kl.action, kl.acted_at,
          rt.id AS room_id, rt.room_name,
@@ -274,10 +260,15 @@ router.get("/keys/history/all", async (req, res) => {
       id: r.id,
       action: r.action,
       acted_at: r.acted_at,
-      room_tags: r.room_id !== null ? { id: r.room_id, room_name: r.room_name } : null,
+      room_tags:
+        r.room_id !== null ? { id: r.room_id, room_name: r.room_name } : null,
       teachers:
         r.teacher_id !== null
-          ? { id: r.teacher_id, name: r.teacher_name, department: r.teacher_department }
+          ? {
+              id: r.teacher_id,
+              name: r.teacher_name,
+              department: r.teacher_department,
+            }
           : null,
     }));
 
@@ -295,12 +286,13 @@ router.get("/keys/history/all", async (req, res) => {
       code: err.code,
       errno: err.errno,
       sqlMessage: err.sqlMessage,
-      sqlState: err.sqlState,
     });
     return res.status(500).json({
       ok: false,
       message: "ดึงประวัติยืม-คืนไม่สำเร็จ",
     });
+  } finally {
+    if (connection) connection.release();
   }
 });
 
