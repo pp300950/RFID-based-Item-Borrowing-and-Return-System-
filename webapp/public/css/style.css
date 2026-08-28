@@ -26,511 +26,523 @@
    เดียว (แสดงแค่การ์ดฟอร์ม) บนจอแคบ/มือถือ
    ================================================================= */
 
-* { box-sizing: border-box; }
-
-:root {
-  --ink: #1C2128;
-  --panel: #262B33;
-  --panel-2: #2E343D;
-  --teal: #3E9C8F;
-  --amber: #E8A33D;
-  --violet: #8B7FD1;
-  --ink-line: #3A4048;
-  --text-hi: #EDEDED;
-  --text-mid: #AEB4BC;
-  --text-low: #6E7580;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--ink);
-  color: var(--text-hi);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-}
-
-.scene {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
-  background:
-    radial-gradient(circle at 15% 10%, rgba(62,156,143,0.10), transparent 40%),
-    radial-gradient(circle at 85% 90%, rgba(232,163,61,0.08), transparent 45%),
-    var(--ink);
-}
-
-/* --- โครงหลัก 2 คอลัมน์ --- */
-.layout {
-  width: 100%;
-  max-width: 940px;
-  display: grid;
-  grid-template-columns: 1fr 420px;
-  gap: 0;
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 18px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
-  overflow: hidden;
-}
-
-/* --- ฝั่งซ้าย: brand panel (เฉพาะจอกว้าง) --- */
-.brand-panel {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 48px 44px;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(62,156,143,0.14), transparent 45%),
-    radial-gradient(circle at 90% 85%, rgba(139,127,209,0.10), transparent 50%),
-    var(--panel);
-  border-right: 1px solid var(--ink-line);
-}
-
-.brand-eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--teal);
-  margin-bottom: 16px;
-}
-
-.brand-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.25;
-  margin: 0 0 14px;
-  letter-spacing: -0.01em;
-}
-
-.brand-sub {
-  font-size: 14px;
-  color: var(--text-mid);
-  line-height: 1.6;
-  max-width: 36ch;
-  margin: 0 0 36px;
-}
-
-.brand-steps {
-  list-style: none;
-  margin: 0 0 40px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.brand-steps li {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.step-index {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--teal);
-  border: 1px solid var(--ink-line);
-  border-radius: 6px;
-  padding: 3px 7px;
-  flex-shrink: 0;
-}
-
-.step-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-hi);
-}
-
-.step-desc {
-  font-size: 12.5px;
-  color: var(--text-mid);
-  margin-top: 2px;
-}
-
-.brand-footer {
-  margin-top: auto;
-  padding-top: 20px;
-  border-top: 1px dashed var(--ink-line);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* --- ปุ่มดูสถานะกุญแจทั้งหมด (แทนลิงก์ตัวหนังสือเดิม) --- */
-.status-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  background: var(--amber);
-  color: #0F1418;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 13.5px;
-  font-weight: 700;
-  text-decoration: none;
-  padding: 11px 20px;
-  border-radius: 999px;
-  margin-bottom: 28px;
-  box-shadow: 0 8px 22px rgba(232, 163, 61, 0.28);
-  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
-}
-
-.status-link:hover {
-  filter: brightness(1.08);
-  box-shadow: 0 10px 26px rgba(232, 163, 61, 0.38);
-}
-
-.status-link:active {
-  transform: scale(0.97);
-}
-
-/* --- ฝั่งขวา: การ์ดฟอร์ม --- */
-.pass-card {
-  background: var(--panel);
-  padding: 40px 32px 28px;
-  position: relative;
-}
-
-.pass-header--mobile-only,
-.pass-footer--mobile-only,
-.status-link--mobile-only {
-  display: none;
-}
-
-.pass-header {
-  text-align: center;
-  margin-bottom: 22px;
-}
-
-.pass-eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--teal);
-  margin-bottom: 10px;
-}
-
-.pass-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 8px;
-  letter-spacing: -0.01em;
-}
-
-/* --- แท็บเลือกบทบาท (สมัครครูใหม่ / แอดมิน) --- */
-.role-row {
-  display: flex;
-  background: var(--panel-2);
-  border-radius: 10px;
-  padding: 4px;
-  gap: 4px;
-  margin-bottom: 20px;
-}
-
-.role-btn {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text-mid);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 10px 0;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
-}
-
-.role-btn.is-active { color: #0F1418; }
-.role-btn[data-role="teacher"].is-active { background: var(--violet); }
-.role-btn[data-role="admin"].is-active { background: var(--amber); }
-
-/* --- เส้นปรุแบบตั๋ว --- */
-.perforation {
-  height: 1px;
-  margin: 0 -32px 20px;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--ink-line) 0,
-    var(--ink-line) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-  position: relative;
-}
-
-/* --- แผงแต่ละบทบาท --- */
-.role-panel { display: none; }
-.role-panel.is-active { display: block; }
-
-/* --- ขั้นตอนของฟอร์มสมัครครู (กรอกฟอร์ม / รอแตะบัตร) ---
-   สำคัญ: ต้องซ่อนทุกขั้นตอนไว้ก่อนเป็นค่าเริ่มต้น (display:none) แล้วให้
-   JS เป็นคนเติม .is-active ให้ขั้นที่ควรโชว์เท่านั้น ไม่งั้นทั้งฟอร์มกับ
-   หน้าจอ "กำลังรอแตะบัตร" จะโชว์ซ้อนกันตั้งแต่โหลดหน้าเว็บครั้งแรก */
-.register-step {
-  display: none;
-}
-
-.register-step.is-active {
-  display: block;
-}
-
-.register-waiting {
-  text-align: center;
-  padding: 20px 10px 4px;
-}
-
-.waiting-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--violet);
-  margin: 0 auto 18px;
-  animation: pulse 1.6s infinite ease-in-out;
-}
-
-.waiting-title {
-  font-size: 15.5px;
-  font-weight: 700;
-  color: var(--text-hi);
-  margin: 0 0 6px;
-}
-
-.waiting-sub {
-  font-size: 13px;
-  color: var(--text-mid);
-  margin: 0 0 22px;
-  line-height: 1.6;
-}
-
-.waiting-sub #waiting-countdown {
-  color: var(--violet);
-  font-family: 'IBM Plex Mono', monospace;
-  font-weight: 700;
-}
-
-.submit-btn--cancel {
-  background: transparent;
-  border: 1px solid var(--ink-line);
-  color: var(--text-mid);
-}
-
-.submit-btn--cancel:hover {
-  filter: none;
-  border-color: #E0645A;
-  color: #E0645A;
-}
-
-/* --- แท็บย่อย เข้าสู่ระบบ / สร้างบัญชี --- */
-.mode-row {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--ink-line);
-}
-
-.mode-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-low);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 4px 10px;
-  margin-right: 18px;
-  cursor: pointer;
-  position: relative;
-  transition: color 0.15s ease;
-}
-
-.mode-btn::after {
-  content: "";
-  position: absolute;
-  left: 0; right: 0; bottom: -1px;
-  height: 2px;
-  background: transparent;
-  transition: background 0.15s ease;
-}
-
-.mode-btn.is-active { color: var(--text-hi); }
-
-[data-role-panel="teacher"] .mode-btn.is-active::after { background: var(--violet); }
-
-/* --- ฟอร์ม --- */
-.mode-form { display: none; }
-.mode-form.is-active { display: block; }
-
-.field { margin-bottom: 16px; }
-
-.field-row {
-  display: flex;
-  gap: 12px;
-}
-.field-row .field { flex: 1; }
-
-label {
-  display: block;
-  font-size: 12.5px;
-  color: var(--text-mid);
-  margin-bottom: 6px;
-  font-weight: 600;
-}
-
-input {
-  width: 100%;
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 9px;
-  padding: 11px 12px;
-  font-size: 14.5px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Mono', monospace;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-input::placeholder { color: var(--text-low); }
-
-input:focus {
-  border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(62,156,143,0.22);
-}
-
-[data-role-panel="teacher"] input:focus {
-  border-color: var(--violet);
-  box-shadow: 0 0 0 3px rgba(139,127,209,0.22);
-}
-
-#form-admin input:focus {
-  border-color: var(--amber);
-  box-shadow: 0 0 0 3px rgba(232,163,61,0.22);
-}
-
-.field-hint {
-  font-size: 11.5px;
-  color: var(--text-low);
-  margin-top: 6px;
-}
-
-/* --- ปุ่มเข้าสู่ระบบ --- */
-.submit-btn {
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  padding: 13px 0;
-  background: var(--teal);
-  color: #0F1418;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-weight: 700;
-  font-size: 15px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  margin-top: 6px;
-  transition: filter 0.15s ease, transform 0.1s ease;
-}
-
-.submit-btn:hover { filter: brightness(1.08); }
-.submit-btn:active { transform: scale(0.98); }
-
-.submit-btn--admin { background: var(--amber); }
-.submit-btn--teacher { background: var(--violet); }
-
-.scan-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #0F1418;
-  animation: pulse 1.6s infinite ease-in-out;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.35; transform: scale(0.85); }
-  50% { opacity: 1; transform: scale(1); }
-}
-
-/* --- ข้อความสถานะ --- */
-.status-msg {
-  min-height: 20px;
-  text-align: center;
-  font-size: 13px;
-  margin-top: 16px;
-  font-weight: 600;
-}
-.status-msg.ok { color: var(--teal); }
-.status-msg.error { color: #E0645A; }
-
-/* --- footer --- */
-.pass-footer,
-.brand-footer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.stamp {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--amber);
-  border: 1px solid var(--amber);
-  border-radius: 5px;
-  padding: 3px 7px;
-  transform: rotate(-3deg);
-  flex-shrink: 0;
-}
-
-.footer-text {
-  font-size: 11px;
-  color: var(--text-low);
-}
-
-/* --- Accessibility: focus visible เสมอ --- */
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--teal);
-  outline-offset: 2px;
-}
-
-/* --- Reduced motion --- */
-@media (prefers-reduced-motion: reduce) {
-  .scan-dot { animation: none; }
-}
-
-/* --- จอแคบ / มือถือ: กลับไปเป็นคอลัมน์เดียว ซ่อน brand panel --- */
-@media (max-width: 860px) {
-  .layout {
-    grid-template-columns: 1fr;
-    max-width: 420px;
-  }
-  .brand-panel { display: none; }
-  .pass-header--mobile-only,
-  .pass-footer--mobile-only {
-    display: flex;
-  }
-  .pass-header--mobile-only { display: block; }
-  .pass-card { padding: 32px 28px 24px; }
-
-  /* ปุ่ม "ดูสถานะกุญแจทั้งหมด" สำรอง เฉพาะจอแคบ (ตัวจริงใน .brand-panel
-     ถูกซ่อนไปแล้วทั้งก้อนด้านบน) ใช้ display:flex + width:100% แทน
-     inline-flex เดิม เพราะที่นี่ไม่มี brand-panel ห่อให้ชิดซ้ายแบบเดิม
-     อีกแล้ว ต้องกางเต็มความกว้างการ์ดแทน */
-  .status-link--mobile-only {
-    display: flex;
-    width: 100%;
-    justify-content: center;
-    margin: 4px 0 20px;
-  }
-}
-
-@media (max-width: 420px) {
-  .pass-card { padding: 26px 20px 20px; }
-  .pass-title { font-size: 21px; }
-}
+   * { box-sizing: border-box; }
+
+   /* --- Global image guard ---
+      ค่าเริ่มต้นกันรูปทุกตัวในระบบ (รูปห้อง/รูปอัปโหลด ฯลฯ) ไม่ให้ยืดเกิน
+      กรอบ container หรือทะลุเลย์เอาต์เวลารูปต้นฉบับมีขนาด/สัดส่วนใหญ่กว่า
+      พื้นที่แสดงผลจริง — max-width กันความกว้างล้น, height: auto กัน
+      การบีบ/ยืดตามอัตราส่วนเดิมเวลาไม่ได้ตั้ง width/height เจาะจงไว้
+      (element ที่มี class เฉพาะ เช่น .room-thumb, .images-modal-tile-img
+      จะกำหนด width/height/object-fit ของตัวเองทับอันนี้อีกที) */
+   img {
+     max-width: 100%;
+     height: auto;
+   }
+   
+   :root {
+     --ink: #1C2128;
+     --panel: #262B33;
+     --panel-2: #2E343D;
+     --teal: #3E9C8F;
+     --amber: #E8A33D;
+     --violet: #8B7FD1;
+     --ink-line: #3A4048;
+     --text-hi: #EDEDED;
+     --text-mid: #AEB4BC;
+     --text-low: #6E7580;
+   }
+   
+   html, body {
+     margin: 0;
+     padding: 0;
+     background: var(--ink);
+     color: var(--text-hi);
+     font-family: 'IBM Plex Sans Thai', sans-serif;
+   }
+   
+   .scene {
+     min-height: 100vh;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     padding: 32px 16px;
+     background:
+       radial-gradient(circle at 15% 10%, rgba(62,156,143,0.10), transparent 40%),
+       radial-gradient(circle at 85% 90%, rgba(232,163,61,0.08), transparent 45%),
+       var(--ink);
+   }
+   
+   /* --- โครงหลัก 2 คอลัมน์ --- */
+   .layout {
+     width: 100%;
+     max-width: 940px;
+     display: grid;
+     grid-template-columns: 1fr 420px;
+     gap: 0;
+     background: var(--panel);
+     border: 1px solid var(--ink-line);
+     border-radius: 18px;
+     box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+     overflow: hidden;
+   }
+   
+   /* --- ฝั่งซ้าย: brand panel (เฉพาะจอกว้าง) --- */
+   .brand-panel {
+     display: flex;
+     flex-direction: column;
+     justify-content: center;
+     padding: 48px 44px;
+     background:
+       radial-gradient(circle at 20% 20%, rgba(62,156,143,0.14), transparent 45%),
+       radial-gradient(circle at 90% 85%, rgba(139,127,209,0.10), transparent 50%),
+       var(--panel);
+     border-right: 1px solid var(--ink-line);
+   }
+   
+   .brand-eyebrow {
+     font-family: 'IBM Plex Mono', monospace;
+     font-size: 11px;
+     letter-spacing: 0.16em;
+     color: var(--teal);
+     margin-bottom: 16px;
+   }
+   
+   .brand-title {
+     font-family: 'IBM Plex Mono', monospace;
+     font-size: 30px;
+     font-weight: 700;
+     line-height: 1.25;
+     margin: 0 0 14px;
+     letter-spacing: -0.01em;
+   }
+   
+   .brand-sub {
+     font-size: 14px;
+     color: var(--text-mid);
+     line-height: 1.6;
+     max-width: 36ch;
+     margin: 0 0 36px;
+   }
+   
+   .brand-steps {
+     list-style: none;
+     margin: 0 0 40px;
+     padding: 0;
+     display: flex;
+     flex-direction: column;
+     gap: 18px;
+   }
+   
+   .brand-steps li {
+     display: flex;
+     align-items: flex-start;
+     gap: 14px;
+   }
+   
+   .step-index {
+     font-family: 'IBM Plex Mono', monospace;
+     font-size: 12px;
+     font-weight: 700;
+     color: var(--teal);
+     border: 1px solid var(--ink-line);
+     border-radius: 6px;
+     padding: 3px 7px;
+     flex-shrink: 0;
+   }
+   
+   .step-title {
+     font-size: 14px;
+     font-weight: 600;
+     color: var(--text-hi);
+   }
+   
+   .step-desc {
+     font-size: 12.5px;
+     color: var(--text-mid);
+     margin-top: 2px;
+   }
+   
+   .brand-footer {
+     margin-top: auto;
+     padding-top: 20px;
+     border-top: 1px dashed var(--ink-line);
+     display: flex;
+     align-items: center;
+     gap: 12px;
+   }
+   
+   /* --- ปุ่มดูสถานะกุญแจทั้งหมด (แทนลิงก์ตัวหนังสือเดิม) --- */
+   .status-link {
+     display: inline-flex;
+     align-items: center;
+     gap: 8px;
+     align-self: flex-start;
+     background: var(--amber);
+     color: #0F1418;
+     font-family: 'IBM Plex Sans Thai', sans-serif;
+     font-size: 13.5px;
+     font-weight: 700;
+     text-decoration: none;
+     padding: 11px 20px;
+     border-radius: 999px;
+     margin-bottom: 28px;
+     box-shadow: 0 8px 22px rgba(232, 163, 61, 0.28);
+     transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+   }
+   
+   .status-link:hover {
+     filter: brightness(1.08);
+     box-shadow: 0 10px 26px rgba(232, 163, 61, 0.38);
+   }
+   
+   .status-link:active {
+     transform: scale(0.97);
+   }
+   
+   /* --- ฝั่งขวา: การ์ดฟอร์ม --- */
+   .pass-card {
+     background: var(--panel);
+     padding: 40px 32px 28px;
+     position: relative;
+   }
+   
+   .pass-header--mobile-only,
+   .pass-footer--mobile-only,
+   .status-link--mobile-only {
+     display: none;
+   }
+   
+   .pass-header {
+     text-align: center;
+     margin-bottom: 22px;
+   }
+   
+   .pass-eyebrow {
+     font-family: 'IBM Plex Mono', monospace;
+     font-size: 11px;
+     letter-spacing: 0.16em;
+     color: var(--teal);
+     margin-bottom: 10px;
+   }
+   
+   .pass-title {
+     font-family: 'IBM Plex Mono', monospace;
+     font-size: 24px;
+     font-weight: 700;
+     margin: 0 0 8px;
+     letter-spacing: -0.01em;
+   }
+   
+   /* --- แท็บเลือกบทบาท (สมัครครูใหม่ / แอดมิน) --- */
+   .role-row {
+     display: flex;
+     background: var(--panel-2);
+     border-radius: 10px;
+     padding: 4px;
+     gap: 4px;
+     margin-bottom: 20px;
+   }
+   
+   .role-btn {
+     flex: 1;
+     border: none;
+     background: transparent;
+     color: var(--text-mid);
+     font-family: 'IBM Plex Sans Thai', sans-serif;
+     font-size: 13.5px;
+     font-weight: 600;
+     padding: 10px 0;
+     border-radius: 7px;
+     cursor: pointer;
+     transition: background 0.18s ease, color 0.18s ease;
+   }
+   
+   .role-btn.is-active { color: #0F1418; }
+   .role-btn[data-role="teacher"].is-active { background: var(--violet); }
+   .role-btn[data-role="admin"].is-active { background: var(--amber); }
+   
+   /* --- เส้นปรุแบบตั๋ว --- */
+   .perforation {
+     height: 1px;
+     margin: 0 -32px 20px;
+     background-image: repeating-linear-gradient(
+       to right,
+       var(--ink-line) 0,
+       var(--ink-line) 6px,
+       transparent 6px,
+       transparent 12px
+     );
+     position: relative;
+   }
+   
+   /* --- แผงแต่ละบทบาท --- */
+   .role-panel { display: none; }
+   .role-panel.is-active { display: block; }
+   
+   /* --- ขั้นตอนของฟอร์มสมัครครู (กรอกฟอร์ม / รอแตะบัตร) ---
+      สำคัญ: ต้องซ่อนทุกขั้นตอนไว้ก่อนเป็นค่าเริ่มต้น (display:none) แล้วให้
+      JS เป็นคนเติม .is-active ให้ขั้นที่ควรโชว์เท่านั้น ไม่งั้นทั้งฟอร์มกับ
+      หน้าจอ "กำลังรอแตะบัตร" จะโชว์ซ้อนกันตั้งแต่โหลดหน้าเว็บครั้งแรก */
+   .register-step {
+     display: none;
+   }
+   
+   .register-step.is-active {
+     display: block;
+   }
+   
+   .register-waiting {
+     text-align: center;
+     padding: 20px 10px 4px;
+   }
+   
+   .waiting-dot {
+     width: 14px;
+     height: 14px;
+     border-radius: 50%;
+     background: var(--violet);
+     margin: 0 auto 18px;
+     animation: pulse 1.6s infinite ease-in-out;
+   }
+   
+   .waiting-title {
+     font-size: 15.5px;
+     font-weight: 700;
+     color: var(--text-hi);
+     margin: 0 0 6px;
+   }
+   
+   .waiting-sub {
+     font-size: 13px;
+     color: var(--text-mid);
+     margin: 0 0 22px;
+     line-height: 1.6;
+   }
+   
+   .waiting-sub #waiting-countdown {
+     color: var(--violet);
+     font-family: 'IBM Plex Mono', monospace;
+     font-weight: 700;
+   }
+   
+   .submit-btn--cancel {
+     background: transparent;
+     border: 1px solid var(--ink-line);
+     color: var(--text-mid);
+   }
+   
+   .submit-btn--cancel:hover {
+     filter: none;
+     border-color: #E0645A;
+     color: #E0645A;
+   }
+   
+   /* --- แท็บย่อย เข้าสู่ระบบ / สร้างบัญชี --- */
+   .mode-row {
+     display: flex;
+     gap: 4px;
+     margin-bottom: 18px;
+     border-bottom: 1px solid var(--ink-line);
+   }
+   
+   .mode-btn {
+     border: none;
+     background: transparent;
+     color: var(--text-low);
+     font-family: 'IBM Plex Sans Thai', sans-serif;
+     font-size: 13px;
+     font-weight: 600;
+     padding: 8px 4px 10px;
+     margin-right: 18px;
+     cursor: pointer;
+     position: relative;
+     transition: color 0.15s ease;
+   }
+   
+   .mode-btn::after {
+     content: "";
+     position: absolute;
+     left: 0; right: 0; bottom: -1px;
+     height: 2px;
+     background: transparent;
+     transition: background 0.15s ease;
+   }
+   
+   .mode-btn.is-active { color: var(--text-hi); }
+   
+   [data-role-panel="teacher"] .mode-btn.is-active::after { background: var(--violet); }
+   
+   /* --- ฟอร์ม --- */
+   .mode-form { display: none; }
+   .mode-form.is-active { display: block; }
+   
+   .field { margin-bottom: 16px; }
+   
+   .field-row {
+     display: flex;
+     gap: 12px;
+   }
+   .field-row .field { flex: 1; }
+   
+   label {
+     display: block;
+     font-size: 12.5px;
+     color: var(--text-mid);
+     margin-bottom: 6px;
+     font-weight: 600;
+   }
+   
+   input {
+     width: 100%;
+     background: var(--panel-2);
+     border: 1px solid var(--ink-line);
+     border-radius: 9px;
+     padding: 11px 12px;
+     font-size: 14.5px;
+     color: var(--text-hi);
+     font-family: 'IBM Plex Mono', monospace;
+     outline: none;
+     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+   }
+   
+   input::placeholder { color: var(--text-low); }
+   
+   input:focus {
+     border-color: var(--teal);
+     box-shadow: 0 0 0 3px rgba(62,156,143,0.22);
+   }
+   
+   [data-role-panel="teacher"] input:focus {
+     border-color: var(--violet);
+     box-shadow: 0 0 0 3px rgba(139,127,209,0.22);
+   }
+   
+   #form-admin input:focus {
+     border-color: var(--amber);
+     box-shadow: 0 0 0 3px rgba(232,163,61,0.22);
+   }
+   
+   .field-hint {
+     font-size: 11.5px;
+     color: var(--text-low);
+     margin-top: 6px;
+   }
+   
+   /* --- ปุ่มเข้าสู่ระบบ --- */
+   .submit-btn {
+     width: 100%;
+     border: none;
+     border-radius: 10px;
+     padding: 13px 0;
+     background: var(--teal);
+     color: #0F1418;
+     font-family: 'IBM Plex Sans Thai', sans-serif;
+     font-weight: 700;
+     font-size: 15px;
+     cursor: pointer;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     gap: 9px;
+     margin-top: 6px;
+     transition: filter 0.15s ease, transform 0.1s ease;
+   }
+   
+   .submit-btn:hover { filter: brightness(1.08); }
+   .submit-btn:active { transform: scale(0.98); }
+   
+   .submit-btn--admin { background: var(--amber); }
+   .submit-btn--teacher { background: var(--violet); }
+   
+   .scan-dot {
+     width: 8px;
+     height: 8px;
+     border-radius: 50%;
+     background: #0F1418;
+     animation: pulse 1.6s infinite ease-in-out;
+   }
+   
+   @keyframes pulse {
+     0%, 100% { opacity: 0.35; transform: scale(0.85); }
+     50% { opacity: 1; transform: scale(1); }
+   }
+   
+   /* --- ข้อความสถานะ --- */
+   .status-msg {
+     min-height: 20px;
+     text-align: center;
+     font-size: 13px;
+     margin-top: 16px;
+     font-weight: 600;
+   }
+   .status-msg.ok { color: var(--teal); }
+   .status-msg.error { color: #E0645A; }
+   
+   /* --- footer --- */
+   .pass-footer,
+   .brand-footer {
+     display: flex;
+     align-items: center;
+     gap: 12px;
+   }
+   
+   .stamp {
+     font-family: 'IBM Plex Mono', monospace;
+     font-size: 10px;
+     letter-spacing: 0.08em;
+     color: var(--amber);
+     border: 1px solid var(--amber);
+     border-radius: 5px;
+     padding: 3px 7px;
+     transform: rotate(-3deg);
+     flex-shrink: 0;
+   }
+   
+   .footer-text {
+     font-size: 11px;
+     color: var(--text-low);
+   }
+   
+   /* --- Accessibility: focus visible เสมอ --- */
+   button:focus-visible,
+   input:focus-visible {
+     outline: 2px solid var(--teal);
+     outline-offset: 2px;
+   }
+   
+   /* --- Reduced motion --- */
+   @media (prefers-reduced-motion: reduce) {
+     .scan-dot { animation: none; }
+   }
+   
+   /* --- จอแคบ / มือถือ: กลับไปเป็นคอลัมน์เดียว ซ่อน brand panel --- */
+   @media (max-width: 860px) {
+     .layout {
+       grid-template-columns: 1fr;
+       max-width: 420px;
+     }
+     .brand-panel { display: none; }
+     .pass-header--mobile-only,
+     .pass-footer--mobile-only {
+       display: flex;
+     }
+     .pass-header--mobile-only { display: block; }
+     .pass-card { padding: 32px 28px 24px; }
+   
+     /* ปุ่ม "ดูสถานะกุญแจทั้งหมด" สำรอง เฉพาะจอแคบ (ตัวจริงใน .brand-panel
+        ถูกซ่อนไปแล้วทั้งก้อนด้านบน) ใช้ display:flex + width:100% แทน
+        inline-flex เดิม เพราะที่นี่ไม่มี brand-panel ห่อให้ชิดซ้ายแบบเดิม
+        อีกแล้ว ต้องกางเต็มความกว้างการ์ดแทน */
+     .status-link--mobile-only {
+       display: flex;
+       width: 100%;
+       justify-content: center;
+       margin: 4px 0 20px;
+     }
+   }
+   
+   @media (max-width: 420px) {
+     .pass-card { padding: 26px 20px 20px; }
+     .pass-title { font-size: 21px; }
+   }

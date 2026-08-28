@@ -9,1038 +9,1049 @@
    บนหน้า login
    ================================================================= */
 
-.admin-shell {
-  min-height: 100vh;
-  display: grid;
-  grid-template-columns: 248px 1fr;
-  background: var(--ink);
-}
-
-/* --- Sidebar --- */
-.admin-sidebar {
-  background:
-    radial-gradient(circle at 20% 15%, rgba(232, 163, 61, 0.10), transparent 45%),
-    var(--panel);
-  border-right: 1px solid var(--ink-line);
-  padding: 28px 18px;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-
-.admin-brand {
-  padding: 0 10px;
-  margin-bottom: 30px;
-}
-
-.admin-brand-eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  color: var(--amber);
-  margin-bottom: 8px;
-}
-
-.admin-brand-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 17px;
-  font-weight: 700;
-  line-height: 1.3;
-  margin: 0;
-}
-
-.admin-nav {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.admin-nav-btn {
-  width: 100%;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-mid);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 11px 12px;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.admin-nav-btn:hover {
-  background: var(--panel-2);
-  color: var(--text-hi);
-}
-
-.admin-nav-btn.is-active {
-  background: rgba(232, 163, 61, 0.14);
-  color: var(--amber);
-}
-
-.admin-nav-index {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid var(--ink-line);
-  border-radius: 6px;
-  padding: 2px 6px;
-  flex-shrink: 0;
-  color: var(--text-low);
-}
-
-.admin-nav-btn.is-active .admin-nav-index {
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-.admin-sidebar-footer {
-  margin-top: auto;
-  padding-top: 18px;
-  border-top: 1px dashed var(--ink-line);
-}
-
-.admin-user-name {
-  font-size: 13px;
-  color: var(--text-mid);
-  margin: 0 0 10px 10px;
-}
-
-.logout-btn {
-  width: 100%;
-  border: 1px solid var(--ink-line);
-  background: transparent;
-  color: var(--text-mid);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 10px 0;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.logout-btn:hover {
-  border-color: #E0645A;
-  color: #E0645A;
-}
-
-/* --- Main content --- */
-.admin-main {
-  padding: 36px 44px 60px;
-  max-width: 1040px;
-}
-
-.admin-header {
-  margin-bottom: 28px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--ink-line);
-}
-
-.admin-header-eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--amber);
-  margin-bottom: 8px;
-}
-
-.admin-header-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 26px;
-  font-weight: 700;
-  margin: 0;
-}
-
-/* --- Sections --- */
-.admin-section { display: none; }
-.admin-section.is-active { display: block; }
-
-.admin-card {
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 14px;
-  padding: 24px;
-  margin-bottom: 24px;
-}
-
-.admin-card-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-hi);
-  margin: 0 0 18px;
-}
-
-/* --- Create forms (inline row of fields) --- */
-.create-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-.create-form .field {
-  margin-bottom: 0;
-  flex: 1 1 160px;
-}
-
-.create-form label {
-  font-size: 11.5px;
-  color: var(--text-mid);
-  margin-bottom: 6px;
-}
-
-.create-form input,
-.create-form select {
-  width: 100%;
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 9px;
-  padding: 10px 12px;
-  font-size: 13.5px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Mono', monospace;
-  outline: none;
-}
-
-.create-form input:focus,
-.create-form select:focus {
-  border-color: var(--amber);
-  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
-}
-
-.create-form select {
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-}
-
-/* --- Buttons --- */
-.btn {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-weight: 700;
-  font-size: 13.5px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.btn:active { transform: scale(0.97); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-.btn--admin {
-  background: var(--amber);
-  color: #0F1418;
-}
-.btn--admin:hover:not(:disabled) { filter: brightness(1.08); }
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--ink-line);
-  color: var(--text-mid);
-}
-.btn--ghost:hover:not(:disabled) {
-  border-color: var(--teal);
-  color: var(--teal);
-}
-
-.btn--danger {
-  background: transparent;
-  border: 1px solid var(--ink-line);
-  color: #E0645A;
-}
-.btn--danger:hover:not(:disabled) {
-  border-color: #E0645A;
-  background: rgba(224, 100, 90, 0.10);
-}
-
-.btn--sm {
-  padding: 7px 12px;
-  font-size: 12.5px;
-  border-radius: 7px;
-}
-
-/* --- Filter row (items section) --- */
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.filter-row label {
-  font-size: 12.5px;
-  color: var(--text-mid);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.filter-row select {
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  outline: none;
-}
-
-/* --- Export row (history section) — ชิดขวาสุดของ filter-row --- */
-.export-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.export-row label {
-  font-size: 12.5px;
-  color: var(--text-mid);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.export-row select {
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  outline: none;
-}
-
-.btn--sm[disabled] {
-  opacity: 0.6;
-}
-
-/* --- Tables --- */
-.table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--ink-line);
-  border-radius: 12px;
-}
-
-table.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-
-.admin-table thead th {
-  text-align: left;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  color: var(--text-low);
-  font-weight: 600;
-  padding: 12px 14px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--ink-line);
-  white-space: nowrap;
-}
-
-.admin-table tbody td {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--ink-line);
-  color: var(--text-hi);
-  vertical-align: middle;
-}
-
-.admin-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.admin-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.row-empty td {
-  text-align: center;
-  color: var(--text-low);
-  padding: 28px 14px;
-  font-style: normal;
-}
-
-.cell-actions {
-  display: flex;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.cell-sub {
-  display: block;
-  font-size: 11.5px;
-  color: var(--text-low);
-  margin-top: 2px;
-}
-
-/* --- Room image thumbnail (admin rooms/keys tables) --- */
-.room-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 9px;
-  object-fit: cover;
-  border: 1px solid var(--ink-line);
-  background: var(--panel);
-  display: block;
-}
-
-.room-thumb-placeholder {
-  width: 56px;
-  height: 56px;
-  border-radius: 9px;
-  border: 1px dashed var(--ink-line);
-  background: var(--panel);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-low);
-  font-size: 10px;
-  text-align: center;
-  line-height: 1.3;
-  flex-shrink: 0;
-}
-
-.room-thumb-cell {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.room-thumb-upload-label {
-  font-size: 10.5px;
-  color: var(--teal);
-  cursor: pointer;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.room-thumb-upload-label:hover {
-  text-decoration: underline;
-}
-
-.room-thumb-upload-input {
-  display: none;
-}
-
-.room-thumb-manage-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-low);
-  font-size: 10.5px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  white-space: nowrap;
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-}
-
-.room-thumb-manage-btn:hover {
-  color: var(--violet);
-  text-decoration: underline;
-}
-
-/* --- Inline-editable table cells --- */
-.edit-inline {
-  width: 100%;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 13.5px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Mono', monospace;
-  outline: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.edit-inline:hover {
-  border-color: var(--ink-line);
-}
-
-.edit-inline:focus {
-  border-color: var(--amber);
-  background: var(--panel);
-  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.18);
-}
-
-select.edit-inline {
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  cursor: pointer;
-}
-
-select.edit-inline:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-/* --- Pills (status badges) --- */
-.pill {
-  display: inline-block;
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pill--active { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
-.pill--inactive { background: rgba(110, 117, 128, 0.18); color: var(--text-low); }
-.pill--available { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
-.pill--borrowed { background: rgba(232, 163, 61, 0.18); color: var(--amber); }
-
-/* --- Teacher tag edit row --- */
-.tag-edit-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tag-input {
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Mono', monospace;
-  outline: none;
-  width: 160px;
-}
-
-.tag-input:focus {
-  border-color: var(--amber);
-  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
-}
-
-/* --- Assignment quota hint --- */
-.quota-hint {
-  font-size: 12px;
-  color: var(--text-low);
-  margin-top: 4px;
-  min-height: 16px;
-}
-
-/* --- Borrow window: field เต็มแถวในฟอร์มเพิ่มห้อง --- */
-.create-form .field--full {
-  flex-basis: 100%;
-}
-
-.borrow-window-editor {
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.bw-days-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.bw-day-btn {
-  min-width: 36px;
-  padding: 7px 8px;
-  border: 1px solid var(--ink-line);
-  background: var(--panel-2);
-  color: var(--text-mid);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 12.5px;
-  font-weight: 600;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.bw-day-btn:hover {
-  border-color: var(--amber);
-}
-
-.bw-day-btn.is-selected {
-  background: rgba(232, 163, 61, 0.20);
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-.bw-time-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.bw-time-input {
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-hi);
-  font-family: 'IBM Plex Mono', monospace;
-  outline: none;
-}
-
-.bw-time-input:focus {
-  border-color: var(--amber);
-  box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
-}
-
-.bw-time-sep {
-  font-size: 12.5px;
-  color: var(--text-low);
-}
-
-.bw-hint {
-  font-size: 11px;
-  color: var(--text-low);
-  margin: 10px 0 0;
-  line-height: 1.5;
-}
-
-/* --- Borrow window: ตัวสรุปในตารางห้อง (ปุ่มเปิด popover) --- */
-.bw-summary-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 180px;
-  background: transparent;
-  border: 1px dashed var(--ink-line);
-  border-radius: 8px;
-  padding: 7px 10px;
-  color: var(--text-mid);
-  font-family: 'IBM Plex Sans Thai', sans-serif;
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-  line-height: 1.4;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.bw-summary-btn:hover {
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-.bw-summary-btn.has-window {
-  border-style: solid;
-  color: var(--amber);
-  border-color: rgba(232, 163, 61, 0.4);
-}
-
-/* --- Borrow window: popover ลอยข้างปุ่มในตาราง --- */
-.bw-popover {
-  position: fixed;
-  z-index: 150;
-  display: none;
-}
-
-.bw-popover.is-visible {
-  display: block;
-}
-
-.bw-popover-card {
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 12px;
-  padding: 14px;
-  width: 300px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
-}
-
-.bw-popover-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.bw-popover-actions .btn--ghost[data-bw-clear] {
-  margin-right: auto;
-}
-
-/* =================================================================
-   Modal จัดการรูปหลายรูปต่อห้อง (Task 2b)
-   -----------------------------------------------------------------
-   โครง overlay/card ใช้ pattern เดียวกับ .confirm-overlay/.confirm-card
-   ทุกจุด (fixed inset, backdrop blur, is-visible toggle) แค่ขยายขนาด
-   การ์ดให้กว้างพอสำหรับกริดรูปภาพ — ไม่ reuse class เดิมตรงๆ เพราะ
-   ต้องการ max-width ต่างกัน (confirm การ์ดแคบเหมาะกับข้อความยืนยัน
-   สั้นๆ ไม่เหมาะกับกริดรูป)
-   ================================================================= */
-.images-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 20, 24, 0.62);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 200;
-}
-
-.images-modal-overlay.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.images-modal-card {
-  position: relative;
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 16px;
-  padding: 28px 26px 24px;
-  width: 100%;
-  max-width: 620px;
-  max-height: 82vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  transform: translateY(6px) scale(0.98);
-  transition: transform 0.15s ease;
-}
-
-.images-modal-overlay.is-visible .images-modal-card {
-  transform: translateY(0) scale(1);
-}
-
-.images-modal-title {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-hi);
-  margin: 0 28px 4px 0;
-}
-
-.images-modal-hint {
-  font-size: 12px;
-  color: var(--text-low);
-  margin: 0 0 18px;
-  line-height: 1.5;
-}
-
-.images-modal-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.images-modal-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: var(--text-low);
-  font-size: 12.5px;
-  padding: 24px 10px;
-  border: 1px dashed var(--ink-line);
-  border-radius: 10px;
-}
-
-/* --- Tile รูปแต่ละใบ --- */
-.images-modal-tile {
-  position: relative;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--ink-line);
-  background: var(--panel);
-  cursor: grab;
-  transition: border-color 0.15s ease, opacity 0.15s ease;
-}
-
-.images-modal-tile:active {
-  cursor: grabbing;
-}
-
-.images-modal-tile.is-dragging {
-  opacity: 0.4;
-}
-
-.images-modal-tile.is-drop-target {
-  border-color: var(--amber);
-  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.35);
-}
-
-.images-modal-tile-img {
-  width: 100%;
-  height: 96px;
-  object-fit: cover;
-  display: block;
-  pointer-events: none; /* กัน browser เริ่ม drag รูปแบบ native ซ้อนกับ drag ของ tile เอง */
-}
-
-.images-modal-tile-order {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  background: rgba(15, 20, 24, 0.72);
-  color: var(--text-hi);
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 999px;
-  pointer-events: none;
-}
-
-.images-modal-tile-order.is-primary {
-  background: var(--amber);
-  color: #0F1418;
-}
-
-.images-modal-tile-delete {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(15, 20, 24, 0.72);
-  color: var(--text-hi);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.images-modal-tile-delete:hover {
-  background: #E0645A;
-  color: #fff;
-}
-
-.images-modal-tile-delete:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* --- Upload dropzone --- */
-.images-modal-upload-zone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--ink-line);
-  border-radius: 10px;
-  padding: 16px;
-  color: var(--text-mid);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-
-.images-modal-upload-zone:hover {
-  border-color: var(--amber);
-  color: var(--amber);
-  background: rgba(232, 163, 61, 0.06);
-}
-
-.images-modal-upload-zone input[type="file"] {
-  display: none;
-}
-
-@media (max-width: 640px) {
-  .images-modal-card {
-    padding: 22px 18px 20px;
+   .admin-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 248px 1fr;
+    background: var(--ink);
   }
-  .images-modal-grid {
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  }
-}
-
-/* --- Toast --- */
-.admin-toast {
-  position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%) translateY(12px);
-  background: var(--panel);
-  border: 1px solid var(--ink-line);
-  color: var(--text-hi);
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 12px 20px;
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 100;
-}
-
-.admin-toast.is-visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.admin-toast.ok { border-color: var(--teal); }
-.admin-toast.error { border-color: #E0645A; }
-
-/* --- Accessibility --- */
-.admin-nav-btn:focus-visible,
-.btn:focus-visible,
-.edit-inline:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .admin-toast { transition: none; }
-}
-
-/* --- จอแคบ: sidebar กลายเป็นแถบบน + เมนูเลื่อนแนวนอน --- */
-@media (max-width: 880px) {
-  .admin-shell {
-    grid-template-columns: 1fr;
-  }
-
+  
+  /* --- Sidebar --- */
   .admin-sidebar {
-    position: static;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--ink-line);
-    padding: 20px 16px;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(232, 163, 61, 0.10), transparent 45%),
+      var(--panel);
+    border-right: 1px solid var(--ink-line);
+    padding: 28px 18px;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
   }
-
-  .admin-brand { margin-bottom: 16px; }
-
+  
+  .admin-brand {
+    padding: 0 10px;
+    margin-bottom: 30px;
+  }
+  
+  .admin-brand-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    color: var(--amber);
+    margin-bottom: 8px;
+  }
+  
+  .admin-brand-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0;
+  }
+  
   .admin-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 8px;
-    padding-bottom: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
-
+  
   .admin-nav-btn {
-    flex-shrink: 0;
-  }
-
-  .admin-sidebar-footer {
-    margin-top: 16px;
-    padding-top: 14px;
+    width: 100%;
+    text-align: left;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-mid);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 12px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  
+  .admin-nav-btn:hover {
+    background: var(--panel-2);
+    color: var(--text-hi);
+  }
+  
+  .admin-nav-btn.is-active {
+    background: rgba(232, 163, 61, 0.14);
+    color: var(--amber);
+  }
+  
+  .admin-nav-index {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--ink-line);
+    border-radius: 6px;
+    padding: 2px 6px;
+    flex-shrink: 0;
+    color: var(--text-low);
+  }
+  
+  .admin-nav-btn.is-active .admin-nav-index {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+  
+  .admin-sidebar-footer {
+    margin-top: auto;
+    padding-top: 18px;
     border-top: 1px dashed var(--ink-line);
   }
-
-  .admin-user-name { margin: 0; }
-  .logout-btn { width: auto; padding: 8px 16px; }
-
+  
+  .admin-user-name {
+    font-size: 13px;
+    color: var(--text-mid);
+    margin: 0 0 10px 10px;
+  }
+  
+  .logout-btn {
+    width: 100%;
+    border: 1px solid var(--ink-line);
+    background: transparent;
+    color: var(--text-mid);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 10px 0;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  
+  .logout-btn:hover {
+    border-color: #E0645A;
+    color: #E0645A;
+  }
+  
+  /* --- Main content --- */
   .admin-main {
-    padding: 24px 18px 48px;
+    padding: 36px 44px 60px;
+    max-width: 1040px;
   }
-
+  
+  .admin-header {
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--ink-line);
+  }
+  
+  .admin-header-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--amber);
+    margin-bottom: 8px;
+  }
+  
+  .admin-header-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0;
+  }
+  
+  /* --- Sections --- */
+  .admin-section { display: none; }
+  .admin-section.is-active { display: block; }
+  
+  .admin-card {
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  
+  .admin-card-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin: 0 0 18px;
+  }
+  
+  /* --- Create forms (inline row of fields) --- */
   .create-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  
+  .create-form .field {
+    margin-bottom: 0;
+    flex: 1 1 160px;
+  }
+  
+  .create-form label {
+    font-size: 11.5px;
+    color: var(--text-mid);
+    margin-bottom: 6px;
+  }
+  
+  .create-form input,
+  .create-form select {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 9px;
+    padding: 10px 12px;
+    font-size: 13.5px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+  }
+  
+  .create-form input:focus,
+  .create-form select:focus {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
+  }
+  
+  .create-form select {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+  }
+  
+  /* --- Buttons --- */
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  
+  .btn--admin {
+    background: var(--amber);
+    color: #0F1418;
+  }
+  .btn--admin:hover:not(:disabled) { filter: brightness(1.08); }
+  
+  .btn--ghost {
+    background: transparent;
+    border: 1px solid var(--ink-line);
+    color: var(--text-mid);
+  }
+  .btn--ghost:hover:not(:disabled) {
+    border-color: var(--teal);
+    color: var(--teal);
+  }
+  
+  .btn--danger {
+    background: transparent;
+    border: 1px solid var(--ink-line);
+    color: #E0645A;
+  }
+  .btn--danger:hover:not(:disabled) {
+    border-color: #E0645A;
+    background: rgba(224, 100, 90, 0.10);
+  }
+  
+  .btn--sm {
+    padding: 7px 12px;
+    font-size: 12.5px;
+    border-radius: 7px;
+  }
+  
+  /* --- Filter row (items section) --- */
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  
+  .filter-row label {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  
+  .filter-row select {
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    outline: none;
+  }
+  
+  /* --- Export row (history section) — ชิดขวาสุดของ filter-row --- */
+  .export-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  
+  .export-row label {
+    font-size: 12.5px;
+    color: var(--text-mid);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  
+  .export-row select {
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    outline: none;
+  }
+  
+  .btn--sm[disabled] {
+    opacity: 0.6;
+  }
+  
+  /* --- Tables --- */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--ink-line);
+    border-radius: 12px;
+  }
+  
+  table.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  
+  .admin-table thead th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: var(--text-low);
+    font-weight: 600;
+    padding: 12px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--ink-line);
+    white-space: nowrap;
+  }
+  
+  .admin-table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--ink-line);
+    color: var(--text-hi);
+    vertical-align: middle;
+  }
+  
+  .admin-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  
+  .admin-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  
+  .row-empty td {
+    text-align: center;
+    color: var(--text-low);
+    padding: 28px 14px;
+    font-style: normal;
+  }
+  
+  .cell-actions {
+    display: flex;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  
+  .cell-sub {
+    display: block;
+    font-size: 11.5px;
+    color: var(--text-low);
+    margin-top: 2px;
+  }
+  
+  /* --- Room image thumbnail (admin rooms/keys tables) ---
+     object-fit: cover + object-position ล็อกไม่ให้รูปยืด/บิดสัดส่วนไม่ว่า
+     รูปต้นฉบับจะเป็นแนวตั้ง/แนวนอน/สี่เหลี่ยมจัตุรัสก็ตาม (crop กึ่งกลาง
+     แทนการ stretch เต็มกรอบ) — max-width/max-height + flex-shrink: 0
+     กันไว้อีกชั้นเผื่อ .room-thumb ถูกวางอยู่ใน flex/table cell ที่บีบพื้นที่
+     แคบกว่า 56px จนรูปโดนบีบสัดส่วนหรือทะลุกรอบแถว */
+  .room-thumb {
+    width: 56px;
+    height: 56px;
+    max-width: 56px;
+    max-height: 56px;
+    border-radius: 9px;
+    object-fit: cover;
+    object-position: center;
+    border: 1px solid var(--ink-line);
+    background: var(--panel);
+    display: block;
+    flex-shrink: 0;
+  }
+  
+  .room-thumb-placeholder {
+    width: 56px;
+    height: 56px;
+    border-radius: 9px;
+    border: 1px dashed var(--ink-line);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-low);
+    font-size: 10px;
+    text-align: center;
+    line-height: 1.3;
+    flex-shrink: 0;
+  }
+  
+  .room-thumb-cell {
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
+    gap: 6px;
   }
-
-  .create-form .field { flex: 1 1 auto; }
-}
-
-/* =================================================================
-   Confirm dialog — แทน window.confirm() ของเบราว์เซอร์ (ซึ่งหน้าตา
-   เป็นกล่อง OS ดิบๆ ไม่ตรงธีม) ด้วยการ์ดลอยตรงกลางจอสไตล์เดียวกับ
-   ระบบ มีปุ่มกากบาทมุมขวาบนให้ปิดได้เหมือน modal ทั่วไป
-   ================================================================= */
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 20, 24, 0.62);
-  backdrop-filter: blur(2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 200;
-}
-
-.confirm-overlay.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.confirm-card {
-  position: relative;
-  background: var(--panel-2);
-  border: 1px solid var(--ink-line);
-  border-radius: 14px;
-  padding: 28px 26px 22px;
-  width: 100%;
-  max-width: 380px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  transform: translateY(6px) scale(0.98);
-  transition: transform 0.15s ease;
-}
-
-.confirm-overlay.is-visible .confirm-card {
-  transform: translateY(0) scale(1);
-}
-
-.confirm-close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: transparent;
-  color: var(--text-low);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.confirm-close:hover {
-  background: var(--panel);
-  color: #E0645A;
-}
-
-.confirm-message {
-  font-size: 14.5px;
-  color: var(--text-hi);
-  line-height: 1.6;
-  margin: 6px 6px 22px;
-  padding-right: 14px;
-}
-
-.confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .confirm-overlay,
+  
+  .room-thumb-upload-label {
+    font-size: 10.5px;
+    color: var(--teal);
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  
+  .room-thumb-upload-label:hover {
+    text-decoration: underline;
+  }
+  
+  .room-thumb-upload-input {
+    display: none;
+  }
+  
+  .room-thumb-manage-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-low);
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    white-space: nowrap;
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+  }
+  
+  .room-thumb-manage-btn:hover {
+    color: var(--violet);
+    text-decoration: underline;
+  }
+  
+  /* --- Inline-editable table cells --- */
+  .edit-inline {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13.5px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  
+  .edit-inline:hover {
+    border-color: var(--ink-line);
+  }
+  
+  .edit-inline:focus {
+    border-color: var(--amber);
+    background: var(--panel);
+    box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.18);
+  }
+  
+  select.edit-inline {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    cursor: pointer;
+  }
+  
+  select.edit-inline:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+  
+  /* --- Pills (status badges) --- */
+  .pill {
+    display: inline-block;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  
+  .pill--active { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
+  .pill--inactive { background: rgba(110, 117, 128, 0.18); color: var(--text-low); }
+  .pill--available { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
+  .pill--borrowed { background: rgba(232, 163, 61, 0.18); color: var(--amber); }
+  
+  /* --- Teacher tag edit row --- */
+  .tag-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .tag-input {
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+    width: 160px;
+  }
+  
+  .tag-input:focus {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
+  }
+  
+  /* --- Assignment quota hint --- */
+  .quota-hint {
+    font-size: 12px;
+    color: var(--text-low);
+    margin-top: 4px;
+    min-height: 16px;
+  }
+  
+  /* --- Borrow window: field เต็มแถวในฟอร์มเพิ่มห้อง --- */
+  .create-form .field--full {
+    flex-basis: 100%;
+  }
+  
+  .borrow-window-editor {
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  
+  .bw-days-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  
+  .bw-day-btn {
+    min-width: 36px;
+    padding: 7px 8px;
+    border: 1px solid var(--ink-line);
+    background: var(--panel-2);
+    color: var(--text-mid);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  
+  .bw-day-btn:hover {
+    border-color: var(--amber);
+  }
+  
+  .bw-day-btn.is-selected {
+    background: rgba(232, 163, 61, 0.20);
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+  
+  .bw-time-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .bw-time-input {
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--text-hi);
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+  }
+  
+  .bw-time-input:focus {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.20);
+  }
+  
+  .bw-time-sep {
+    font-size: 12.5px;
+    color: var(--text-low);
+  }
+  
+  .bw-hint {
+    font-size: 11px;
+    color: var(--text-low);
+    margin: 10px 0 0;
+    line-height: 1.5;
+  }
+  
+  /* --- Borrow window: ตัวสรุปในตารางห้อง (ปุ่มเปิด popover) --- */
+  .bw-summary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 180px;
+    background: transparent;
+    border: 1px dashed var(--ink-line);
+    border-radius: 8px;
+    padding: 7px 10px;
+    color: var(--text-mid);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.4;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  
+  .bw-summary-btn:hover {
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+  
+  .bw-summary-btn.has-window {
+    border-style: solid;
+    color: var(--amber);
+    border-color: rgba(232, 163, 61, 0.4);
+  }
+  
+  /* --- Borrow window: popover ลอยข้างปุ่มในตาราง --- */
+  .bw-popover {
+    position: fixed;
+    z-index: 150;
+    display: none;
+  }
+  
+  .bw-popover.is-visible {
+    display: block;
+  }
+  
+  .bw-popover-card {
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 12px;
+    padding: 14px;
+    width: 300px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  }
+  
+  .bw-popover-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  
+  .bw-popover-actions .btn--ghost[data-bw-clear] {
+    margin-right: auto;
+  }
+  
+  /* =================================================================
+     Modal จัดการรูปหลายรูปต่อห้อง (Task 2b)
+     -----------------------------------------------------------------
+     โครง overlay/card ใช้ pattern เดียวกับ .confirm-overlay/.confirm-card
+     ทุกจุด (fixed inset, backdrop blur, is-visible toggle) แค่ขยายขนาด
+     การ์ดให้กว้างพอสำหรับกริดรูปภาพ — ไม่ reuse class เดิมตรงๆ เพราะ
+     ต้องการ max-width ต่างกัน (confirm การ์ดแคบเหมาะกับข้อความยืนยัน
+     สั้นๆ ไม่เหมาะกับกริดรูป)
+     ================================================================= */
+  .images-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 20, 24, 0.62);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 200;
+  }
+  
+  .images-modal-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .images-modal-card {
+    position: relative;
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 16px;
+    padding: 28px 26px 24px;
+    width: 100%;
+    max-width: 620px;
+    max-height: 82vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    transform: translateY(6px) scale(0.98);
+    transition: transform 0.15s ease;
+  }
+  
+  .images-modal-overlay.is-visible .images-modal-card {
+    transform: translateY(0) scale(1);
+  }
+  
+  .images-modal-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin: 0 28px 4px 0;
+  }
+  
+  .images-modal-hint {
+    font-size: 12px;
+    color: var(--text-low);
+    margin: 0 0 18px;
+    line-height: 1.5;
+  }
+  
+  .images-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  
+  .images-modal-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-low);
+    font-size: 12.5px;
+    padding: 24px 10px;
+    border: 1px dashed var(--ink-line);
+    border-radius: 10px;
+  }
+  
+  /* --- Tile รูปแต่ละใบ --- */
+  .images-modal-tile {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--ink-line);
+    background: var(--panel);
+    cursor: grab;
+    transition: border-color 0.15s ease, opacity 0.15s ease;
+  }
+  
+  .images-modal-tile:active {
+    cursor: grabbing;
+  }
+  
+  .images-modal-tile.is-dragging {
+    opacity: 0.4;
+  }
+  
+  .images-modal-tile.is-drop-target {
+    border-color: var(--amber);
+    box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.35);
+  }
+  
+  .images-modal-tile-img {
+    width: 100%;
+    height: 96px;
+    max-width: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    pointer-events: none; /* กัน browser เริ่ม drag รูปแบบ native ซ้อนกับ drag ของ tile เอง */
+  }
+  
+  .images-modal-tile-order {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(15, 20, 24, 0.72);
+    color: var(--text-hi);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    pointer-events: none;
+  }
+  
+  .images-modal-tile-order.is-primary {
+    background: var(--amber);
+    color: #0F1418;
+  }
+  
+  .images-modal-tile-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(15, 20, 24, 0.72);
+    color: var(--text-hi);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  
+  .images-modal-tile-delete:hover {
+    background: #E0645A;
+    color: #fff;
+  }
+  
+  .images-modal-tile-delete:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* --- Upload dropzone --- */
+  .images-modal-upload-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--ink-line);
+    border-radius: 10px;
+    padding: 16px;
+    color: var(--text-mid);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+  }
+  
+  .images-modal-upload-zone:hover {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(232, 163, 61, 0.06);
+  }
+  
+  .images-modal-upload-zone input[type="file"] {
+    display: none;
+  }
+  
+  @media (max-width: 640px) {
+    .images-modal-card {
+      padding: 22px 18px 20px;
+    }
+    .images-modal-grid {
+      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    }
+  }
+  
+  /* --- Toast --- */
+  .admin-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    background: var(--panel);
+    border: 1px solid var(--ink-line);
+    color: var(--text-hi);
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 12px 20px;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 100;
+  }
+  
+  .admin-toast.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  
+  .admin-toast.ok { border-color: var(--teal); }
+  .admin-toast.error { border-color: #E0645A; }
+  
+  /* --- Accessibility --- */
+  .admin-nav-btn:focus-visible,
+  .btn:focus-visible,
+  .edit-inline:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .admin-toast { transition: none; }
+  }
+  
+  /* --- จอแคบ: sidebar กลายเป็นแถบบน + เมนูเลื่อนแนวนอน --- */
+  @media (max-width: 880px) {
+    .admin-shell {
+      grid-template-columns: 1fr;
+    }
+  
+    .admin-sidebar {
+      position: static;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--ink-line);
+      padding: 20px 16px;
+    }
+  
+    .admin-brand { margin-bottom: 16px; }
+  
+    .admin-nav {
+      flex-direction: row;
+      overflow-x: auto;
+      gap: 8px;
+      padding-bottom: 4px;
+    }
+  
+    .admin-nav-btn {
+      flex-shrink: 0;
+    }
+  
+    .admin-sidebar-footer {
+      margin-top: 16px;
+      padding-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px dashed var(--ink-line);
+    }
+  
+    .admin-user-name { margin: 0; }
+    .logout-btn { width: auto; padding: 8px 16px; }
+  
+    .admin-main {
+      padding: 24px 18px 48px;
+    }
+  
+    .create-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  
+    .create-form .field { flex: 1 1 auto; }
+  }
+  
+  /* =================================================================
+     Confirm dialog — แทน window.confirm() ของเบราว์เซอร์ (ซึ่งหน้าตา
+     เป็นกล่อง OS ดิบๆ ไม่ตรงธีม) ด้วยการ์ดลอยตรงกลางจอสไตล์เดียวกับ
+     ระบบ มีปุ่มกากบาทมุมขวาบนให้ปิดได้เหมือน modal ทั่วไป
+     ================================================================= */
+  .confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 20, 24, 0.62);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 200;
+  }
+  
+  .confirm-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
   .confirm-card {
-    transition: none;
+    position: relative;
+    background: var(--panel-2);
+    border: 1px solid var(--ink-line);
+    border-radius: 14px;
+    padding: 28px 26px 22px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    transform: translateY(6px) scale(0.98);
+    transition: transform 0.15s ease;
   }
-}
+  
+  .confirm-overlay.is-visible .confirm-card {
+    transform: translateY(0) scale(1);
+  }
+  
+  .confirm-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    color: var(--text-low);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  
+  .confirm-close:hover {
+    background: var(--panel);
+    color: #E0645A;
+  }
+  
+  .confirm-message {
+    font-size: 14.5px;
+    color: var(--text-hi);
+    line-height: 1.6;
+    margin: 6px 6px 22px;
+    padding-right: 14px;
+  }
+  
+  .confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .confirm-overlay,
+    .confirm-card {
+      transition: none;
+    }
+  }
