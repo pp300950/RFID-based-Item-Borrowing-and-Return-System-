@@ -1,13 +1,14 @@
 {
   "name": "rfid-borrow-system",
   "version": "0.1.0",
-  "description": "ระบบยืม-คืนอุปกรณ์ด้วยแท็ก RFID (เวอร์ชันทดสอบ - หน้าสมัคร/เข้าสู่ระบบ)",
+  "description": "ระบบยืม-คืนกุญแจด้วยแท็ก RFID (MySQL + Line OA Notify + Cloudflare Tunnel)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
   },
   "dependencies": {
+    "axios": "^1.6.5",
     "cors": "^2.8.6",
     "docx": "^9.7.1",
     "dotenv": "^16.4.5",
