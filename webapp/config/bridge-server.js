@@ -24,7 +24,7 @@
 require("dotenv").config();
 const express = require("express");
 const crypto = require("crypto");
-const { query, pool } = require("./config/mysql-pool");
+const { query, pool } = require("./mysql-pool");
 
 const PORT = process.env.BRIDGE_PORT ? Number(process.env.BRIDGE_PORT) : 4001;
 const AUTH_KEY = process.env.BRIDGE_AUTH_KEY;

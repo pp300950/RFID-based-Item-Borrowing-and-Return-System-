@@ -110,8 +110,6 @@ npm uninstall @supabase/supabase-js
    cd webapp
    mkdir public\uploads\room-images
    ```
-   (ถ้าใช้ Git Bash / Mac / Linux ให้ใช้ `mkdir -p public/uploads/room-images` แทน)
-4. Import `schema.sql` เข้า database ผ่าน phpMyAdmin (แท็บ Import) หรือ CLI
 
 ---
 
@@ -126,64 +124,158 @@ npm uninstall @supabase/supabase-js
 
 ---
 
-## 7. Cloudflare Tunnel (สำหรับให้เว็บบน Render ต่อกลับมาที่ MySQL เครื่องนี้)
+## 7. Bridge + Cloudflare Tunnel (สำหรับให้เว็บบน Render ต่อกลับมาที่ MySQL เครื่องนี้)
 
 ทำตามนี้เฉพาะตอนต้องการให้ **เว็บออนไลน์ (Render) ใช้งานได้ด้วย** — ถ้าใช้แค่
 เครื่อง local (offline) ไม่ต้องทำ section นี้เลย
 
+> ⚠️ **สถาปัตยกรรมนี้คนละแบบกับ Cloudflare Tunnel ตรง MySQL แบบเดิม** —
+> Render **ไม่ได้ต่อ MySQL ตรงๆ** แต่คุยผ่าน HTTP ไปหา
+> `config/bridge-server.js` (โปรแกรมเล็กๆ ที่รันแยกอีก process บนเครื่องนี้)
+> แล้ว `bridge-server.js` ค่อยไปคุย MySQL ผ่าน `localhost` ต่ออีกที —
+> พอร์ต MySQL (3306) เลย**ไม่ต้องเปิดออกอินเทอร์เน็ตเลยแม้แต่จุดเดียว**
+> ปลอดภัยกว่าแบบเดิม ดู README.md section 11 สำหรับรายละเอียดเหตุผล
+>
+> **อัปเดต:** ตัว tunnel ที่ใช้จริงตอนนี้คือ **Cloudflare Tunnel** (คำสั่ง
+> `cloudflared`) ไม่ใช่ ngrok แล้ว — เปลี่ยนมาใช้ตัวนี้เพราะไม่ต้องสมัคร
+> บัญชีก็รันแบบ quick tunnel ได้เลย ส่วนแนวคิดโดยรวม (bridge คุย MySQL
+> ผ่าน localhost, tunnel แค่เปิด bridge ออกเน็ต) เหมือนเดิมทุกอย่าง
+
+ต้องมี **3 อย่างรันพร้อมกันตลอดเวลา** บนเครื่องนี้ เว็บ Render ถึงจะใช้งานได้:
+
+1. XAMPP (MySQL ต้อง Start ค้างไว้ — ดูข้อ 2)
+2. `config/bridge-server.js` (โปรแกรมคนละตัวกับ `server.js` หลัก รันแยก terminal)
+3. cloudflared (tunnel ที่เปิดพอร์ตของ bridge-server.js ออกอินเทอร์เน็ต)
+
+ถ้าอันใดอันหนึ่งใน 3 อย่างนี้หยุดทำงาน (ปิด terminal, เครื่องปิด, MySQL
+ไม่ได้ start) **เว็บบน Render จะใช้งานไม่ได้ทันที** — เป็น trade-off ที่
+ยอมรับแล้วของสถาปัตยกรรมนี้ ไม่ใช่บั๊ก
+
 ### 7.1 ติดตั้ง cloudflared (ทำครั้งเดียวต่อเครื่อง)
 
-1. โหลดตัวติดตั้งสำหรับ Windows จาก:
-   https://github.com/cloudflare/cloudflared/releases
-   (เลือกไฟล์ `cloudflared-windows-amd64.msi`)
-2. ติดตั้งตามปกติ (Next ไปเรื่อยๆ)
-3. เปิด Terminal / PowerShell ใหม่ แล้วเช็คว่าติดตั้งสำเร็จ:
+1. โหลดตัวติดตั้งสำหรับ Windows จาก
+   https://github.com/cloudflare/cloudflared/releases (เลือกไฟล์
+   `cloudflared-windows-amd64.exe` แล้วเปลี่ยนชื่อเป็น `cloudflared.exe`
+   ก็ได้ หรือติดตั้งผ่าน winget แทนก็ได้ง่ายกว่า):
+   ```
+   winget install --id Cloudflare.cloudflared
+   ```
+2. ปิด Terminal แล้วเปิดใหม่ (เหมือนตอนลง Node.js) จากนั้นเช็คว่าติดตั้งสำเร็จ:
    ```
    cloudflared --version
    ```
    ถ้าขึ้นเลขเวอร์ชันมา แปลว่าใช้ได้แล้ว
 
-### 7.2 เปิด tunnel ชี้ไปที่ MySQL (ทำทุกครั้งที่จะให้เว็บ Render ใช้งานได้)
+> ต่างจาก ngrok ตรงที่ **quick tunnel ของ cloudflared ไม่ต้องสมัครบัญชี
+> หรือใส่ authtoken ก็รันได้เลย** ข้ามขั้นตอนสมัครบัญชี/คัดลอก token ไปได้
+> เลยในเวอร์ชันนี้
 
-**ต้อง Start MySQL ใน XAMPP ไว้ก่อนเสมอ** (ดูข้อ 2) แล้วค่อยรันคำสั่งนี้:
+### 7.2 ตั้งค่า `.env` ฝั่ง bridge (ทำครั้งเดียว ก่อนรัน bridge-server.js ครั้งแรก)
+
+`bridge-server.js` อ่านค่าจากไฟล์ `.env` เดียวกับ `server.js` หลัก —
+เพิ่ม 2 บรรทัดนี้เข้าไปในไฟล์ `.env` (ถ้ายังไม่มี ดู `.env.example`
+เป็นตัวอย่าง):
 
 ```
-cloudflared access tcp --hostname <จะได้ตอนตั้งค่าแบบผูกโดเมน> --url tcp://localhost:3306
+BRIDGE_PORT=4001
+BRIDGE_AUTH_KEY=<สุ่มมายาวๆ ห้ามเว้นว่าง>
 ```
 
-> **สำหรับตอนเริ่มต้น (ยังไม่มีโดเมน/Cloudflare account):** ใช้ Quick
-> Tunnel แทน ซึ่งไม่ต้อง login ก็รันได้เลย:
-> ```
-> cloudflared tunnel --url tcp://localhost:3306
-> ```
-> รันแล้วจะมีบรรทัดขึ้นมาแสดง URL ชั่วคราวรูปแบบ
-> `https://xxxxx.trycloudflare.com` — **คัดลอกส่วน `xxxxx.trycloudflare.com`
-> เก็บไว้** เพื่อเอาไปกรอกเป็นค่า `DB_HOST` ใน Environment Variables ของ
-> Render (ดู README.md section 7.4)
+`BRIDGE_AUTH_KEY` คือคีย์ลับกันคนแปลกหน้ายิง SQL เข้ามาผ่าน bridge
+(bridge-server.js **จะไม่ยอมสตาร์ทเลยถ้าไม่ตั้งค่านี้**) สุ่มได้ด้วย:
 
-**ต้องเปิด Terminal ที่รันคำสั่งนี้ค้างไว้ตลอดเวลา** ห้ามปิดหน้าต่างนี้ —
-ถ้าปิด tunnel จะขาด และเว็บ Render จะต่อฐานข้อมูลไม่ได้ทันที
-
-> ⚠️ **ข้อควรรู้เรื่อง Quick Tunnel:** ทุกครั้งที่รันคำสั่งนี้ใหม่ (เช่น
-> หลังปิด Terminal หรือรีสตาร์ทเครื่อง) จะได้ URL ใหม่ทุกครั้ง ต้องเข้าไป
-> แก้ค่า `DB_HOST` บน Render ใหม่ทุกรอบด้วย — ถ้าเจอปัญหานี้บ่อยจนน่ารำคาญ
-> บอกผมได้ จะช่วยตั้งค่าแบบผูกโดเมนถาวร (Named Tunnel) ให้ URL คงที่
-> ไม่เปลี่ยนอีก (ต้องมีโดเมนของตัวเอง หรือใช้โดเมนฟรีจากผู้ให้บริการ
-> อื่นเชื่อมเข้า Cloudflare ก็ได้)
-
-### 7.3 สร้าง MySQL user แยกสำหรับ Render (ทำครั้งเดียว ก่อนเปิด tunnel ใช้งานจริงครั้งแรก)
-
-**ห้ามให้ Render ต่อด้วย user `root`** เข้า phpMyAdmin → แท็บ **SQL** แล้ว
-รันคำสั่งนี้ (เปลี่ยน `รหัสผ่านที่นี่` เป็นรหัสผ่านที่ตั้งเอง):
-
-```sql
-CREATE USER 'render_app'@'%' IDENTIFIED BY '300950';
-GRANT SELECT, INSERT, UPDATE, DELETE ON key_borrow_db.* TO 'render_app'@'%';
-FLUSH PRIVILEGES;
+```
+openssl rand -hex 32
 ```
 
-แล้วใช้ `render_app` / รหัสผ่านนี้เป็นค่า `DB_USER` / `DB_PASSWORD` บน
-Render แทนการใช้ `root`
+ถ้าเครื่องไม่มีคำสั่ง `openssl` (บาง Windows ไม่มีติดมาให้) พิมพ์อะไรก็ได้
+ที่ยาวๆ สุ่มๆ แทนก็พอ (เช่น 40 ตัวอักษรผสมตัวเลข) ขอแค่จำได้/คัดลอกเก็บไว้
+เพราะต้องเอาไปใส่ฝั่ง Render ด้วย (ดูข้อ 7.4)
+
+> ⚠️ **ห้ามใส่ค่า `BRIDGE_AUTH_KEY` จริงไว้ในไฟล์ README หรือ commit ขึ้น
+> GitHub เด็ดขาด** — ถ้าเคยมีคีย์จริงหลุดไปอยู่ในเอกสาร/แชท/commit ไหนมา
+> ก่อน ให้สุ่มคีย์ใหม่แล้วอัปเดตทั้งฝั่ง `.env` local และ `DB_BRIDGE_KEY`
+> บน Render ให้ตรงกันทันที
+
+### 7.3 รัน bridge-server.js + เปิด cloudflared (ทำทุกครั้งที่จะให้เว็บ Render ใช้งานได้)
+
+**ต้อง Start MySQL ใน XAMPP ไว้ก่อนเสมอ** (ดูข้อ 2) จากนั้นเปิด
+**Terminal 2 หน้าต่างแยกกัน** (คนละหน้าต่างจากที่รัน `npm start` ของเว็บหลัก
+ถ้าเปิดเว็บหลักไว้ด้วย):
+
+**Terminal A — รัน bridge-server.js:**
+```
+cd webapp
+cd config
+node bridge-server.js
+```
+ถ้าขึ้น `✓ bridge-server.js กำลังรันที่ http://localhost:4001` แปลว่า
+สำเร็จ ปล่อยหน้าต่างนี้ค้างไว้ ห้ามปิด
+
+ทดสอบได้ทันทีในเบราว์เซอร์ (หรือด้วย `curl`/`Invoke-WebRequest` ใน
+PowerShell — อย่าพิมพ์ URL ตรงๆ ใน PowerShell เฉยๆ เพราะมันจะพยายาม
+ตีความเป็นคำสั่ง):
+```
+http://localhost:4001/health
+```
+ควรขึ้น `{"ok":true,"message":"bridge-server is running"}`
+
+**Terminal B — เปิด cloudflared ชี้ไปที่พอร์ตของ bridge:**
+```
+cloudflared tunnel --url http://localhost:4001
+```
+ไม่ต้อง cd ไปไหนก่อนก็ได้ รันแล้วจะมีข้อความยาวๆ ขึ้นมา ให้หาบรรทัดที่มี
+URL ลักษณะแบบนี้ (อยู่ใต้ "Your quick Tunnel has been created!"):
+```
+https://xxxxx-xxxxx-xxxxx-xxxxx.trycloudflare.com
+```
+**คัดลอก URL ที่ลงท้ายด้วย `.trycloudflare.com` เก็บไว้** เพื่อเอาไปกรอก
+เป็นค่า `DB_BRIDGE_URL` ใน Environment Variables ของ Render (ดูข้อ 7.4)
+
+ปล่อยหน้าต่างนี้ค้างไว้เช่นกัน ห้ามปิด — ถ้าปิด tunnel จะขาด เว็บ Render
+จะต่อฐานข้อมูลไม่ได้ทันที
+
+> ⚠️ **ข้อควรรู้เรื่อง Cloudflare quick tunnel:** ทุกครั้งที่รันคำสั่ง
+> `cloudflared tunnel --url http://localhost:4001` ใหม่ (เช่น หลังปิด
+> Terminal หรือรีสตาร์ทเครื่อง) จะได้ URL สุ่มใหม่ทุกครั้ง (ชื่อสุ่มแบบ
+> `usual-lemon-pros-converted.trycloudflare.com` เปลี่ยนไปเรื่อยๆ) ต้อง
+> เข้าไปแก้ค่า `DB_BRIDGE_URL` บน Render ใหม่ทุกรอบด้วย — ถ้าเจอปัญหานี้
+> บ่อยจนน่ารำคาญ บอกผมได้ จะช่วยตั้งค่าแบบ named tunnel (ผูกกับ
+> Cloudflare account + domain) ให้ URL คงที่ไม่เปลี่ยนอีก
+
+### 7.4 ตั้งค่า Environment Variables บน Render (ทำครั้งเดียว/อัปเดตเมื่อ URL เปลี่ยน)
+
+เข้า Render dashboard → เลือกเว็บ service นี้ → **Environment** → ตั้งค่า:
+
+```
+DB_MODE=bridge
+DB_BRIDGE_URL=<URL จาก cloudflared ในข้อ 7.3 เช่น https://xxxx.trycloudflare.com>
+DB_BRIDGE_KEY=<ต้องเป็นค่าเดียวกับ BRIDGE_AUTH_KEY ในข้อ 7.2 เป๊ะๆ>
+```
+
+**ไม่ต้องตั้ง** `DB_HOST` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` บน
+Render เลย เพราะโหมด bridge ไม่ได้ต่อ MySQL ตรงจากฝั่ง Render — ตัวแปร
+เหล่านั้นเป็นของเครื่อง local เท่านั้น (ดูข้อ 5)
+
+ทุกครั้งที่เปิด cloudflared ใหม่แล้วได้ URL ใหม่ (ดูคำเตือนในข้อ 7.3) ต้อง
+กลับมาแก้ `DB_BRIDGE_URL` ตรงนี้ให้ตรงกับ URL ล่าสุดเสมอ ไม่งั้นเว็บ
+Render จะยิงไปหา URL เก่าที่ตายไปแล้ว
+
+### 7.5 เช็คว่า bridge ทำงานถูกต้อง
+
+เปิด browser ไปที่ URL จาก cloudflared ต่อท้ายด้วย `/health` เช่น
+`https://xxxx.trycloudflare.com/health` — ถ้าขึ้น
+`{"ok":true,"message":"bridge-server is running"}` แปลว่า bridge
+ทำงานปกติและ tunnel เชื่อมถึงแล้ว (endpoint นี้ไม่ต้อง auth key)
+
+ถ้าเว็บ Render โหลดข้อมูลไม่ขึ้น (เช่น หน้าแอดมินขึ้น error) ให้เช็คตาม
+ลำดับนี้:
+1. XAMPP MySQL ยัง Start อยู่ไหม
+2. Terminal A (`bridge-server.js`) ยังเปิดค้างไม่มี error ไหม
+3. Terminal B (`cloudflared`) ยังเปิดค้างอยู่ไหม
+4. `DB_BRIDGE_URL` บน Render ตรงกับ URL ล่าสุดจาก cloudflared ไหม
+5. `DB_BRIDGE_KEY` บน Render ตรงกับ `BRIDGE_AUTH_KEY` ในไฟล์ `.env` เป๊ะไหม
+   (พิมพ์ผิดตัวเดียวก็จะขึ้น `401 unauthorized` ทันที)
 
 ---
 
@@ -203,10 +295,13 @@ Render แทนการใช้ `root`
       ค่าจริง) **ไฟล์นี้ git ไม่เก็บให้ ต้องสร้างใหม่ทุกเครื่อง** และสร้าง
       โฟลเดอร์ `public/uploads/room-images/`
 - [ ] **ข้อ 7** — ถ้าเครื่องนี้จะเป็นเครื่องหลักที่เปิดค้างไว้ให้ Render
-      ต่อด้วย: ติดตั้ง `cloudflared` + สร้าง MySQL user แยกสำหรับ Render
-      (ทำครั้งเดียว) — ถ้าเครื่องนี้ใช้แค่ offline ไม่ต้องทำข้อนี้
-- [ ] ถ้าเปลี่ยนเครื่องหลักที่เปิด tunnel ไปใช้เครื่องนี้แทน อย่าลืมเข้าไป
-      แก้ค่า `DB_HOST` บน Render ให้เป็น URL tunnel ของเครื่องใหม่ด้วย
-      (ไม่งั้นเว็บ Render ยังจะพยายามต่อไปที่เครื่องเก่าอยู่)
+      ต่อด้วย: ติดตั้ง `cloudflared` (ข้อ 7.1) + ตั้งค่า `BRIDGE_PORT`/
+      `BRIDGE_AUTH_KEY` ใน `.env` (ข้อ 7.2) — ถ้าเครื่องนี้ใช้แค่ offline
+      ไม่ต้องทำข้อนี้
+- [ ] ถ้าเปลี่ยนเครื่องหลักที่เปิด bridge+cloudflared ไปใช้เครื่องนี้แทน
+      อย่าลืมเข้าไปแก้ค่า `DB_BRIDGE_URL` บน Render ให้เป็น URL
+      cloudflared ของเครื่องใหม่ด้วย (ไม่งั้นเว็บ Render ยังจะพยายามยิง
+      ไปที่เครื่องเก่าอยู่) และเช็คว่า `DB_BRIDGE_KEY` บน Render ยังตรง
+      กับ `BRIDGE_AUTH_KEY` ของเครื่องใหม่
 - [ ] **ข้อ 6** — รัน `npm start` แล้วเช็คทุก flow ตามลิสต์ทดสอบ (สมัครครู
       → ยืม → คืน → ดูประวัติ → export → อัปโหลดรูป)
