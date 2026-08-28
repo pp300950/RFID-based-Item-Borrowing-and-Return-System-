@@ -24,10 +24,62 @@
 require("dotenv").config();
 const express = require("express");
 const crypto = require("crypto");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 const { query, pool } = require("./mysql-pool");
 
 const PORT = process.env.BRIDGE_PORT ? Number(process.env.BRIDGE_PORT) : 4001;
 const AUTH_KEY = process.env.BRIDGE_AUTH_KEY;
+
+// -------------------------------------------------------------
+// โฟลเดอร์ปลายทางของรูปห้อง — เส้นทางเดียวกับที่ server.js หลัก (โหมด
+// local) และ express.static เสิร์ฟอยู่ นั่นคือ <repo root>/public/
+// uploads/room-images/ เพราะ bridge-server.js อยู่ที่ root เดียวกัน
+// (คนละ process แต่คนละ codebase เดียวกันบนเครื่องนี้) — ต้องเป็น
+// path เดียวกันเป๊ะ ไม่งั้นรูปที่รับผ่าน bridge จะไม่โผล่ในเว็บหลัก
+// -------------------------------------------------------------
+const ROOM_IMAGES_DIR = path.join(__dirname, "public", "uploads", "room-images");
+fs.mkdirSync(ROOM_IMAGES_DIR, { recursive: true });
+
+// multer: รับไฟล์ที่ forward มาจาก Render (admin_rooms.js โหมด bridge)
+// เขียนตรงไป ROOM_IMAGES_DIR เลย — field name "image" เดี่ยว เพราะฝั่ง
+// admin_rooms.js forward ทีละไฟล์เสมอ (แม้ endpoint หลายไฟล์ก็ loop
+// forward ทีละไฟล์มาที่นี่ ไม่ส่งเป็นก้อน — ดูเหตุผลใน admin_rooms.js)
+// ไม่ตั้งชื่อไฟล์ในนี้ — รับชื่อไฟล์ที่ Render กำหนดมาแล้ว (ส่งมาใน
+// field "filename" แยกต่างหาก) เพื่อให้ room-<id>-<timestamp>.<ext>
+// ตรงกับ image_url ที่ Render บันทึกลง DB เป๊ะ ไม่ใช้ multer สุ่มชื่อเอง
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, ROOM_IMAGES_DIR),
+  filename: (req, file, cb) => {
+    const desiredName = req.body && req.body.filename;
+    if (!desiredName || /[/\\]/.test(desiredName)) {
+      // กัน path traversal / field ว่าง — ปฏิเสธด้วยชื่อ fallback ที่
+      // ปลอดภัย แล้วให้ handler เช็ค req.body.filename อีกทีและลบทิ้ง
+      // ถ้าไม่ตรงกัน (validation หลักอยู่ใน handler ด้านล่าง)
+      return cb(null, `rejected-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    }
+    cb(null, desiredName);
+  },
+});
+
+const uploadImage = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB — เท่ากับ limit ฝั่ง admin_rooms.js
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("ไฟล์ต้องเป็นรูปภาพเท่านั้น"));
+    }
+    cb(null, true);
+  },
+});
+
+// เลขคุมชื่อไฟล์: room-<id>-<digits/suffix>.<ext ปกติของรูป> เท่านั้น —
+// ตรงกับรูปแบบที่ admin_rooms.js ตั้งไว้ทั้ง endpoint เดี่ยวและหลายไฟล์
+// (ดู filename callback ใน admin_rooms.js) ใช้เช็คซ้ำใน handler กัน
+// filename แปลกปลอมหลุดผ่าน multer callback ด้านบนมาได้ (เช่นใครยิง
+// ตรงมาที่ bridge ข้าม admin_rooms.js โดยรู้ auth key)
+const SAFE_IMAGE_FILENAME = /^room-[A-Za-z0-9]+-[A-Za-z0-9-]+\.(jpg|jpeg|png|gif|webp)$/i;
 
 if (!AUTH_KEY) {
   console.error(
@@ -249,6 +301,69 @@ app.post("/transaction/rollback", requireBridgeAuth, async (req, res) => {
   } finally {
     tx.connection.release();
   }
+});
+
+// -------------------------------------------------------------
+// POST /upload-image — รับไฟล์รูปที่ forward มาจาก admin_rooms.js
+// (โหมด DB_MODE=bridge บน Render) เขียนลง ROOM_IMAGES_DIR บนเครื่องนี้
+// ตรงๆ ให้ตรงกับ path ที่ server.js หลัก (โหมด local) เสิร์ฟผ่าน
+// express.static อยู่แล้ว — ทำให้ทุกคนที่เข้าเว็บ (ไม่ว่าจะผ่าน
+// localhost:3000 หรือผ่าน onrender) เห็นรูปเดียวกันเสมอ เพราะไฟล์จริง
+// อยู่ที่เดียวกันบนดิสก์ ไม่ได้แยกกันคนละเครื่องเหมือนก่อนแก้
+//
+// multipart/form-data:
+//   image     ไฟล์รูป (บังคับ)
+//   filename  ชื่อไฟล์ปลายทางที่ Render กำหนดมาแล้ว เช่น
+//             "room-12-1735000000000.jpg" (บังคับ — ต้องตรงรูปแบบ
+//             SAFE_IMAGE_FILENAME เท่านั้น กันเขียนทับ/หลุด path)
+// response: { ok: true, filename } | { ok: false, message }
+// -------------------------------------------------------------
+app.post("/upload-image", requireBridgeAuth, uploadImage.single("image"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ ok: false, message: "missing file field 'image'" });
+  }
+
+  const desiredName = req.body && req.body.filename;
+
+  if (!desiredName || !SAFE_IMAGE_FILENAME.test(desiredName) || req.file.filename !== desiredName) {
+    // multer เขียนไฟล์ลงดิสก์ไปแล้วก่อนถึงจุดนี้ (destination/filename
+    // callback รันก่อน handler เสมอ) — ถ้าชื่อไม่ผ่านเกณฑ์ ลบไฟล์ที่
+    // เพิ่งเขียนทิ้งทันที กัน orphan/แปลกปลอมค้างบนดิสก์
+    fs.unlink(req.file.path, (unlinkErr) => {
+      if (unlinkErr) {
+        console.error("bridge /upload-image: cleanup rejected file failed:", unlinkErr.message);
+      }
+    });
+    return res.status(400).json({
+      ok: false,
+      message: "invalid or mismatched 'filename' — must match room-<id>-<suffix>.<ext>",
+    });
+  }
+
+  res.json({ ok: true, filename: req.file.filename });
+});
+
+// -------------------------------------------------------------
+// DELETE /image — ลบไฟล์รูปออกจากดิสก์ตรงๆ (best-effort เหมือนที่
+// admin_rooms.js ทำกับ fs.unlink เดิมทุกจุดตอนโหมด local)
+// body: { filename }
+// response: { ok: true } เสมอ แม้ไฟล์จะไม่มีอยู่แล้วก็ตาม (ไม่ถือเป็น
+// error ร้ายแรง — เป้าหมายคือ "ไม่มีไฟล์นี้อยู่แล้วหลังเรียกจบ")
+// -------------------------------------------------------------
+app.delete("/image", requireBridgeAuth, express.json(), (req, res) => {
+  const { filename } = req.body || {};
+
+  if (!filename || !SAFE_IMAGE_FILENAME.test(filename)) {
+    return res.status(400).json({ ok: false, message: "invalid or missing 'filename'" });
+  }
+
+  const filePath = path.join(ROOM_IMAGES_DIR, filename);
+  fs.unlink(filePath, (unlinkErr) => {
+    if (unlinkErr && unlinkErr.code !== "ENOENT") {
+      console.error("bridge /image delete warning:", unlinkErr.message);
+    }
+    res.json({ ok: true });
+  });
 });
 
 // -------------------------------------------------------------

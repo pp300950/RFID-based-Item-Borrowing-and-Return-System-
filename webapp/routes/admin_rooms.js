@@ -38,39 +38,78 @@ const router = express.Router();
 const { query, withTransaction } = require("../config/db");
 
 // -------------------------------------------------------------
+// [Fix] DB_MODE=bridge (รันบน Render) — ไฟล์รูปต้องไปอยู่บนเครื่อง
+// local (คู่กับ XAMPP) ไม่ใช่ดิสก์ของ Render เอง (ephemeral + คนละ
+// เครื่องกับที่ express.static เสิร์ฟไฟล์อยู่จริง) จึงต้องแยกพฤติกรรม
+// การจัดการไฟล์ตาม DB_MODE เป็นจุดเดียวตรงนี้:
+//   - local  : multer diskStorage เขียนไฟล์ลงดิสก์ตรงๆ เหมือนเดิมทุก
+//              ประการ ไม่มีอะไรเปลี่ยน
+//   - bridge : multer memoryStorage เก็บไฟล์เป็น buffer ใน memory ก่อน
+//              แล้ว forward ไปให้ bridge-server.js เขียนลงดิสก์บน
+//              เครื่อง local แทน ผ่าน POST /upload-image (multipart)
+//              และลบไฟล์ผ่าน DELETE /image — ใช้ DB_BRIDGE_URL/
+//              DB_BRIDGE_KEY ตัวเดียวกับที่ config/db-bridge-client.js
+//              ใช้อยู่แล้ว ไม่ต้องเพิ่ม env ใหม่
+// -------------------------------------------------------------
+const DB_MODE = process.env.DB_MODE === "bridge" ? "bridge" : "local";
+const BRIDGE_URL = process.env.DB_BRIDGE_URL;
+const BRIDGE_KEY = process.env.DB_BRIDGE_KEY;
+const BRIDGE_UPLOAD_TIMEOUT_MS = 20000; // เท่ากับ FETCH_TIMEOUT_MS ใน db-bridge-client.js
+
+// -------------------------------------------------------------
 // โฟลเดอร์ปลายทางของรูปห้อง — สร้างไว้ล่วงหน้าตอนโหลดไฟล์นี้ กัน
 // "ENOENT: no such directory" ตอนอัปโหลดรูปแรกสุดถ้ายังไม่มีโฟลเดอร์
 // (git ไม่ track โฟลเดอร์ว่าง ต้องสร้างเองตอน startup)
+// โหมด bridge ไม่ได้เขียนไฟล์ลงโฟลเดอร์นี้เอง (bridge-server.js เขียน
+// ลงโฟลเดอร์เดียวกันนี้แต่บนเครื่อง local ต่างหาก) แต่ยังสร้างไว้เผื่อ
+// ไม่ให้พังถ้ามีโค้ดอื่นอ้างอิง path นี้อยู่
 // -------------------------------------------------------------
 const ROOM_IMAGES_DIR = path.join(__dirname, "..", "public", "uploads", "room-images");
 fs.mkdirSync(ROOM_IMAGES_DIR, { recursive: true });
 
 // -------------------------------------------------------------
-// multer: diskStorage เขียนไฟล์ตรงไป public/uploads/room-images/ เลย
-// (แทน memoryStorage() + ส่งต่อให้ Supabase Storage ของเดิม)
-// ตั้งชื่อไฟล์ตอน "เขียนจริง" ใน filename callback ให้ตรงรูปแบบเดิม
-// room-<id>-<timestamp>.<ext> — endpoint เดี่ยว (upload.single) ใช้
-// req.params.id ได้ตรงๆ เพราะ multer parse route param มาก่อนแล้ว
-// ตอน callback นี้ทำงาน ส่วน endpoint หลายไฟล์ (upload.array) เติม
-// random suffix กันชนกันเวลาไฟล์หลายไฟล์มาถึง Date.now() เดียวกัน
-// เหมือนของเดิม
+// buildRoomImageFilename(id, isMulti) -> "room-<id>-<suffix>.<ext>"
+// ใช้ตั้งชื่อไฟล์ปลายทางให้ตรงรูปแบบเดิมทั้งสองโหมด (โหมด local ให้
+// multer filename callback เรียกใช้ตอน "เขียนจริง", โหมด bridge ต้อง
+// รู้ชื่อไฟล์ล่วงหน้าก่อนส่ง เพราะเป็นคนกำหนดชื่อเองแล้วบอก bridge
+// ให้เขียนด้วยชื่อนี้ ไม่ใช่ให้ bridge สุ่มชื่อเอง — ดูคอมเมนต์ multer
+// callback ใน bridge-server.js)
+// -------------------------------------------------------------
+function buildRoomImageFilename(id, originalname, isMulti) {
+  const ext = (originalname.split(".").pop() || "jpg").toLowerCase();
+  const suffix = isMulti
+    ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    : `${Date.now()}`;
+  return `room-${id}-${suffix}.${ext}`;
+}
+
+// -------------------------------------------------------------
+// multer: โหมด local ใช้ diskStorage เขียนไฟล์ตรงไป
+// public/uploads/room-images/ เลย (แทน memoryStorage() + ส่งต่อให้
+// Supabase Storage ของเดิม) ตั้งชื่อไฟล์ตอน "เขียนจริง" ใน filename
+// callback ให้ตรงรูปแบบเดิม room-<id>-<timestamp>.<ext>
+//
+// โหมด bridge ใช้ memoryStorage แทน เพราะไฟล์ต้อง forward ไปเขียนที่
+// เครื่อง local ผ่าน bridge ไม่ใช่เขียนบนดิสก์ของ Render เอง — ชื่อไฟล์
+// คำนวณด้วย buildRoomImageFilename() เดียวกัน แล้วส่งชื่อนี้ไปพร้อม
+// ไฟล์ตอนเรียก forwardImageToBridge() ด้านล่าง เพื่อให้ image_url ที่
+// บันทึกลง DB ตรงกับชื่อไฟล์จริงบนเครื่อง local เป๊ะ
 //
 // จำกัดขนาด 5MB และรับเฉพาะไฟล์ที่ mimetype เป็นรูปภาพเท่านั้น (เหมือนเดิม)
 // -------------------------------------------------------------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, ROOM_IMAGES_DIR);
-  },
-  filename: (req, file, cb) => {
-    const id = req.params.id;
-    const ext = (file.originalname.split(".").pop() || "jpg").toLowerCase();
-    const suffix =
-      req.route && req.route.path && req.route.path.endsWith("/images")
-        ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        : `${Date.now()}`;
-    cb(null, `room-${id}-${suffix}.${ext}`);
-  },
-});
+const storage =
+  DB_MODE === "local"
+    ? multer.diskStorage({
+        destination: (req, file, cb) => {
+          cb(null, ROOM_IMAGES_DIR);
+        },
+        filename: (req, file, cb) => {
+          const id = req.params.id;
+          const isMulti = req.route && req.route.path && req.route.path.endsWith("/images");
+          cb(null, buildRoomImageFilename(id, file.originalname, isMulti));
+        },
+      })
+    : multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -82,6 +121,108 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+// -------------------------------------------------------------
+// forwardImageToBridge(file, filename) -> Promise<void>
+// เฉพาะโหมด bridge — ส่งไฟล์ที่อยู่ใน memory (req.file.buffer จาก
+// multer memoryStorage) ไปให้ bridge-server.js เขียนลงดิสก์บนเครื่อง
+// local ผ่าน POST /upload-image (multipart/form-data)
+// throw error ถ้า bridge ตอบ ok: false หรือต่อไม่ติด — handler ที่
+// เรียกฟังก์ชันนี้ต้อง catch แล้วตอบ 500/ error ที่เหมาะสมเอง
+// (ไม่มีไฟล์ค้างบนดิสก์ Render ต้องลบเพราะ memoryStorage ไม่เขียน
+// ไฟล์ชั่วคราวลงดิสก์ตั้งแต่แรก ต่างจาก diskStorage โหมด local)
+// -------------------------------------------------------------
+async function forwardImageToBridge(file, filename) {
+  if (!BRIDGE_URL || !BRIDGE_KEY) {
+    throw new Error("DB_BRIDGE_URL / DB_BRIDGE_KEY ยังไม่ได้ตั้งค่า");
+  }
+
+  const form = new FormData();
+  form.append("filename", filename);
+  form.append("image", new Blob([file.buffer], { type: file.mimetype }), filename);
+
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), BRIDGE_UPLOAD_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(`${BRIDGE_URL}/upload-image`, {
+      method: "POST",
+      headers: { "X-Bridge-Key": BRIDGE_KEY },
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`bridge upload timeout หลังจาก ${BRIDGE_UPLOAD_TIMEOUT_MS}ms — เช็คว่าเครื่อง local + bridge-server.js + tunnel ยังรันอยู่ไหม`);
+    }
+    throw new Error(`ต่อ bridge ไม่ได้ (/upload-image): ${err.message} — เช็คว่าเครื่อง local + bridge-server.js + tunnel ยังรันอยู่ไหม`);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  let data;
+  try {
+    data = await response.json();
+  } catch (err) {
+    throw new Error(`bridge ตอบกลับไม่ใช่ JSON ที่ถูกต้อง (/upload-image): ${err.message}`);
+  }
+
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "bridge /upload-image ล้มเหลว");
+  }
+}
+
+// -------------------------------------------------------------
+// deleteImageViaBridge(filename) -> Promise<void>
+// เฉพาะโหมด bridge — สั่งให้ bridge-server.js ลบไฟล์บนเครื่อง local
+// ทิ้ง ผ่าน DELETE /image เป็น best-effort เหมือน fs.unlink ของโหมด
+// local ทุกประการ (ไม่ throw ถ้าลบไม่สำเร็จ — แค่ log warning เฉยๆ
+// เพราะไม่อยากให้ request หลักล้มเพราะลบไฟล์เก่าไม่ผ่าน)
+// -------------------------------------------------------------
+async function deleteImageViaBridge(filename) {
+  if (!BRIDGE_URL || !BRIDGE_KEY) {
+    console.error("Cleanup room image via bridge warning: DB_BRIDGE_URL / DB_BRIDGE_KEY ยังไม่ได้ตั้งค่า");
+    return;
+  }
+  try {
+    const response = await fetch(`${BRIDGE_URL}/image`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Bridge-Key": BRIDGE_KEY,
+      },
+      body: JSON.stringify({ filename }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.ok) {
+      console.error("Cleanup room image via bridge warning:", (data && data.message) || response.statusText);
+    }
+  } catch (err) {
+    console.error("Cleanup room image via bridge warning:", err.message);
+  }
+}
+
+// -------------------------------------------------------------
+// deleteRoomImageFile(imageUrl) -> Promise<void>
+// จุดเดียวที่ตัดสินใจว่าจะลบไฟล์รูปเก่า/ที่ถูกลบด้วย fs.unlink ตรงๆ
+// (โหมด local) หรือสั่งผ่าน bridge (โหมด bridge) — เรียกใช้แทน
+// fs.unlink ตรงๆ ทุกจุดในไฟล์นี้ที่ต้องลบไฟล์รูป เป็น best-effort
+// เหมือนกันทั้งสองโหมด ไม่ throw ออกไปให้ request หลักล้ม
+// -------------------------------------------------------------
+async function deleteRoomImageFile(imageUrl) {
+  const filename = path.basename(imageUrl);
+  if (DB_MODE === "bridge") {
+    await deleteImageViaBridge(filename);
+    return;
+  }
+  const filePath = path.join(ROOM_IMAGES_DIR, filename);
+  fs.unlink(filePath, (unlinkErr) => {
+    if (unlinkErr) {
+      console.error("Cleanup room image warning:", unlinkErr.message);
+    }
+  });
+}
 
 // -------------------------------------------------------------
 // validateBorrowWindow({ borrowWindowDays, borrowWindowStart, borrowWindowEnd })
@@ -359,6 +500,16 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
     return res.status(400).json({ ok: false, message: "กรุณาเลือกไฟล์รูปภาพ" });
   }
 
+  // [Fix] โหมด bridge: multer memoryStorage ไม่เขียนไฟล์ลงดิสก์ของ
+  // Render เลย (ต่างจาก local ที่ diskStorage เขียนไปแล้วก่อนถึงจุดนี้)
+  // จึงไม่มีอะไรต้อง fs.unlink cleanup ถ้า id ผิด/ล้มเหลวก่อนส่งไป
+  // bridge — cleanup เฉพาะไฟล์ที่ "ส่งไป bridge สำเร็จแล้ว" เท่านั้น
+  // (ดู catch ท้ายฟังก์ชัน)
+  const filename =
+    DB_MODE === "bridge" ? buildRoomImageFilename(id, req.file.originalname, false) : req.file.filename;
+
+  let forwardedToBridge = false;
+
   try {
     // เช็คก่อนว่าห้องนี้มีจริง กัน orphan ไฟล์บนดิสก์ถ้า id ผิด
     const [roomRows] = await query(
@@ -367,19 +518,30 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
     );
 
     if (roomRows.length === 0) {
-      // id ผิด แต่ multer เขียนไฟล์ลงดิสก์ไปแล้วก่อนถึงจุดนี้ (ต่างจาก
-      // memoryStorage เดิมที่ buffer ยังไม่ถูกอัปโหลดจนกว่าจะเรียก
-      // supabase.storage.upload เอง) ลบไฟล์กำพร้าทิ้งแบบ best-effort
-      fs.unlink(req.file.path, (unlinkErr) => {
-        if (unlinkErr) {
-          console.error("Cleanup orphaned room image warning:", unlinkErr.message);
-        }
-      });
+      // id ผิด — โหมด local: multer เขียนไฟล์ลงดิสก์ไปแล้วก่อนถึงจุดนี้
+      // ลบไฟล์กำพร้าทิ้งแบบ best-effort (โหมด bridge ยังไม่ได้ forward
+      // ไปที่ไหนเลย ไม่มีอะไรต้องลบ)
+      if (DB_MODE === "local") {
+        fs.unlink(req.file.path, (unlinkErr) => {
+          if (unlinkErr) {
+            console.error("Cleanup orphaned room image warning:", unlinkErr.message);
+          }
+        });
+      }
       return res.status(404).json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
     }
 
     const room = roomRows[0];
-    const imageUrl = `/uploads/room-images/${req.file.filename}`;
+
+    // โหมด bridge: forward ไฟล์ไปให้ bridge-server.js เขียนลงดิสก์บน
+    // เครื่อง local ก่อน ถ้าล้มเหลว throw ออกไปให้ catch ด้านล่างจัดการ
+    // (ยังไม่ได้แตะ DB เลยตอนนี้ ไม่ต้อง rollback อะไร)
+    if (DB_MODE === "bridge") {
+      await forwardImageToBridge(req.file, filename);
+      forwardedToBridge = true;
+    }
+
+    const imageUrl = `/uploads/room-images/${filename}`;
 
     const [updateResult] = await query(
       `UPDATE room_tags SET image_url = ? WHERE id = ?`,
@@ -395,21 +557,27 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
     // ลบรูปเก่าทิ้งถ้ามี (best-effort — ไม่ throw ถ้าลบไม่สำเร็จ เพราะ
     // รูปใหม่บันทึกสำเร็จไปแล้ว ไม่อยากให้ request ทั้งเส้นล้มเพราะเรื่องนี้)
     // [MySQL] image_url ตอนนี้เป็น path สัมพัทธ์ (/uploads/room-images/xxx)
-    // แทน public URL เต็มของ Supabase — แปลงเป็น path บนดิสก์ตรงๆ ด้วย
-    // path.join(ROOM_IMAGES_DIR, basename) แทนการ split ด้วยชื่อ bucket
+    // แทน public URL เต็มของ Supabase — deleteRoomImageFile() จัดการ
+    // ทั้งสองโหมด (local: fs.unlink ตรงๆ, bridge: สั่งผ่าน bridge)
     if (room.image_url) {
-      const oldFilename = path.basename(room.image_url);
-      const oldFilePath = path.join(ROOM_IMAGES_DIR, oldFilename);
-      fs.unlink(oldFilePath, (unlinkErr) => {
-        if (unlinkErr) {
-          console.error("Cleanup old room image warning:", unlinkErr.message);
-        }
-      });
+      deleteRoomImageFile(room.image_url);
     }
 
     return res.json({ ok: true, room: updatedRows[0] });
   } catch (err) {
     console.error("Admin upload room image error:", err.message);
+    // โหมด bridge + forward สำเร็จไปแล้วแต่ล้มเหลวหลังจากนั้น (เช่น
+    // update DB ไม่ผ่าน) — ลบไฟล์ที่เพิ่ง forward ไปทิ้งกัน orphan บน
+    // เครื่อง local (best-effort เหมือน cleanup อื่นๆ ในไฟล์นี้)
+    if (DB_MODE === "bridge" && forwardedToBridge) {
+      deleteImageViaBridge(filename);
+    } else if (DB_MODE === "local" && req.file) {
+      fs.unlink(req.file.path, (unlinkErr) => {
+        if (unlinkErr) {
+          console.error("Cleanup orphaned room image warning:", unlinkErr.message);
+        }
+      });
+    }
     return res.status(500).json({
       ok: false,
       message: "อัปโหลดรูปภาพไม่สำเร็จ",
@@ -445,11 +613,25 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
     return res.status(400).json({ ok: false, message: "กรุณาเลือกไฟล์รูปภาพอย่างน้อย 1 ไฟล์" });
   }
 
-  const uploadedFilePaths = req.files.map((file) => file.path);
+  // [Fix] โหมด bridge: คำนวณชื่อไฟล์ล่วงหน้าให้แต่ละไฟล์ (multer
+  // memoryStorage ไม่ตั้งชื่อ/เขียนไฟล์ให้เอง) แล้ว track ว่า forward
+  // ไป bridge สำเร็จแล้วกี่ไฟล์ เผื่อต้อง cleanup ทีหลัง — โหมด local
+  // ยังใช้ req.files[].path ที่ diskStorage เขียนไปแล้วเหมือนเดิม
+  const bridgeFilenames =
+    DB_MODE === "bridge"
+      ? req.files.map((file) => buildRoomImageFilename(id, file.originalname, true))
+      : null;
+  const forwardedFilenames = [];
 
   const cleanupUploadedFiles = () => {
-    for (const filePath of uploadedFilePaths) {
-      fs.unlink(filePath, (unlinkErr) => {
+    if (DB_MODE === "bridge") {
+      for (const filename of forwardedFilenames) {
+        deleteImageViaBridge(filename);
+      }
+      return;
+    }
+    for (const file of req.files) {
+      fs.unlink(file.path, (unlinkErr) => {
         if (unlinkErr) {
           console.error("Cleanup orphaned room images warning:", unlinkErr.message);
         }
@@ -469,6 +651,19 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
       return res.status(404).json({ ok: false, message: "ไม่พบห้อง/กุญแจนี้" });
     }
 
+    // โหมด bridge: forward ทุกไฟล์ไปให้ bridge-server.js เขียนลงดิสก์
+    // บนเครื่อง local ทีละไฟล์ (bridge รองรับทีละไฟล์เท่านั้น ดู
+    // คอมเมนต์หัวไฟล์ bridge-server.js) ก่อนแตะ DB เลย — ถ้าไฟล์ใดไฟล์
+    // หนึ่ง forward ไม่สำเร็จ ลบไฟล์ที่ forward ไปแล้วก่อนหน้าทิ้งทั้งหมด
+    // แล้ว throw ออกไปให้ catch ด้านล่างตอบ error (ยังไม่แตะ DB เลย
+    // ตอนนี้ ไม่ต้อง rollback อะไรฝั่ง DB)
+    if (DB_MODE === "bridge") {
+      for (let i = 0; i < req.files.length; i += 1) {
+        await forwardImageToBridge(req.files[i], bridgeFilenames[i]);
+        forwardedFilenames.push(bridgeFilenames[i]);
+      }
+    }
+
     // หา sort_order สูงสุดปัจจุบันของห้องนี้ เพื่อต่อท้ายลำดับเดิม
     const [maxRows] = await query(
       `SELECT sort_order FROM room_images WHERE room_tag_id = ? ORDER BY sort_order DESC LIMIT 1`,
@@ -477,10 +672,11 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
 
     let nextSortOrder = maxRows.length > 0 ? maxRows[0].sort_order + 1 : 0;
 
-    const insertedRows = req.files.map((file) => {
+    const insertedRows = req.files.map((file, index) => {
+      const filename = DB_MODE === "bridge" ? bridgeFilenames[index] : file.filename;
       const row = {
         room_tag_id: id,
-        image_url: `/uploads/room-images/${file.filename}`,
+        image_url: `/uploads/room-images/${filename}`,
         sort_order: nextSortOrder,
       };
       nextSortOrder += 1;
@@ -566,13 +762,9 @@ router.delete("/rooms/:id/images/:imageId", async (req, res) => {
 
     // ลบไฟล์จริงออกจากดิสก์ด้วย (best-effort — record ใน DB ลบไปแล้ว
     // สำเร็จ ไม่อยากให้ request ทั้งเส้นล้มเพราะลบไฟล์บนดิสก์ไม่ผ่าน)
-    const oldFilename = path.basename(image.image_url);
-    const oldFilePath = path.join(ROOM_IMAGES_DIR, oldFilename);
-    fs.unlink(oldFilePath, (unlinkErr) => {
-      if (unlinkErr) {
-        console.error("Cleanup deleted room image warning:", unlinkErr.message);
-      }
-    });
+    // [Fix] deleteRoomImageFile() จัดการทั้งสองโหมด — local: fs.unlink
+    // ตรงๆ, bridge: สั่ง bridge-server.js ลบไฟล์บนเครื่อง local แทน
+    deleteRoomImageFile(image.image_url);
 
     return res.json({ ok: true });
   } catch (err) {
