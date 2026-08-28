@@ -91,6 +91,13 @@ npm uninstall @supabase/supabase-js
 - **jsonwebtoken** → ใช้กับ `middleware_auth.js` (auth ด้วย JWT)
 - **@supabase/supabase-js** → ถอดออกเพราะไม่ใช้ Supabase แล้ว
 
+
+สุดท้ายจบด้วย
+cd C:\Users\Administrator\RFID-based-Item-Borrowing-and-Return-System-\webapp
+npm start
+
+ถ้าตัดปัญหาด้านความปลอดภัยรัน
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ---
 
 ## 5. ก่อนรันครั้งแรกหลังย้ายมา MySQL
