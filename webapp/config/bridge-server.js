@@ -75,6 +75,31 @@ function requireBridgeAuth(req, res, next) {
   next();
 }
 
+// [Fix] คู่กับ encodeBuffersForTransport ฝั่ง db-bridge-client.js (Render)
+// — ฝั่งนั้นแปลง Buffer เป็น { __isBuffer: true, base64: "..." } ก่อนส่ง
+// JSON มา (เพราะ JSON.stringify(Buffer) ปกติจะได้ { type: "Buffer",
+// data: [...] } ซึ่งพอส่งเข้า mysql2 ตรงๆ จะกลายเป็น SQL string literal
+// "[object Object]" แทนที่จะเป็น binary จริง — ทำให้รูปที่อัปโหลดผ่าน
+// bridge เสียตั้งแต่ตอนเขียนลง MySQL) ฟังก์ชันนี้แปลง marker กลับเป็น
+// Buffer จริงก่อนส่งต่อให้ mysql2 ต้องเรียกทุกจุดที่รับ params จาก
+// request body (ทั้ง /query และ /transaction/query ด้านล่าง)
+function decodeBuffersFromTransport(value) {
+  if (Array.isArray(value)) {
+    return value.map(decodeBuffersFromTransport);
+  }
+  if (value && typeof value === "object") {
+    if (value.__isBuffer === true && typeof value.base64 === "string") {
+      return Buffer.from(value.base64, "base64");
+    }
+    const out = {};
+    for (const key of Object.keys(value)) {
+      out[key] = decodeBuffersFromTransport(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
 // -------------------------------------------------------------
 // GET /health — ไม่ต้อง auth เพราะไม่แตะ MySQL และไม่คืนข้อมูลอะไรที่
 // เป็นความลับ ใช้เช็คว่า tunnel + bridge process ยังรันอยู่ไหมจากฝั่ง
@@ -95,7 +120,10 @@ app.post("/query", requireBridgeAuth, async (req, res) => {
     return res.status(400).json({ ok: false, message: "missing or invalid 'sql'" });
   }
   try {
-    const [rows, fields] = await query(sql, params);
+    // [Fix] แปลง { __isBuffer, base64 } marker กลับเป็น Buffer จริงก่อน
+    // ส่งเข้า mysql2 — ดูคอมเมนต์ decodeBuffersFromTransport ด้านบน
+    const realParams = decodeBuffersFromTransport(params);
+    const [rows, fields] = await query(sql, realParams);
     res.json({ ok: true, rows, fields });
   } catch (err) {
     console.error("bridge /query error:", err.message);
@@ -187,7 +215,12 @@ app.post("/transaction/query", requireBridgeAuth, async (req, res) => {
   }
   scheduleTxTimeout(txId); // reset timeout ทุกครั้งที่มีการใช้งานจริง
   try {
-    const [rows, fields] = await tx.connection.query(sql, params);
+    // [Fix] เช่นเดียวกับ /query — POST /rooms/:id/images (อัปโหลดหลาย
+    // รูปพร้อมกัน) ใช้ withTransaction() ซึ่งวิ่งผ่าน endpoint นี้ ต้อง
+    // decode buffer marker กลับก่อนใช้เหมือนกัน ไม่งั้นรูปที่อัปโหลด
+    // ผ่านโมดัล "จัดการรูป (หลายรูป)" จะเสียแบบเดียวกับ /rooms/:id/image
+    const realParams = decodeBuffersFromTransport(params);
+    const [rows, fields] = await tx.connection.query(sql, realParams);
     res.json({ ok: true, rows, fields });
   } catch (err) {
     // query ล้มเหลวกลางทาง transaction — rollback + เคลียร์ทันที ไม่รอ
