@@ -64,12 +64,24 @@ insert into room_tags (room_name, tag_uid) values ('B103', '0058632534');
 
 ## 3. รันโปรเจกต์ (ทำทุกครั้งที่จะเปิดใช้งาน)
 
+
+
+
+
+
+
 ```
 cd RFID-based-Item-Borrowing-and-Return-System-
 cd webapp
 npm install
 npm start
 ```
+
+
+
+
+
+
 
 > `npm install` ไม่ต้องรันทุกครั้งก็ได้ถ้าไม่มีอะไรเปลี่ยน แต่รันซ้ำได้ไม่มีผลเสีย ปลอดภัยไว้ก่อน
 
@@ -207,12 +219,27 @@ openssl rand -hex 32
 ถ้าเปิดเว็บหลักไว้ด้วย):
 
 **Terminal A — รัน bridge-server.js:**
+
+
+
+
+
+
+
+
 ```
 cd RFID-based-Item-Borrowing-and-Return-System-
 cd webapp
 cd config
 node bridge-server.js
 ```
+
+
+
+
+
+
+
 ถ้าขึ้น `✓ bridge-server.js กำลังรันที่ http://localhost:4001` แปลว่า
 สำเร็จ ปล่อยหน้าต่างนี้ค้างไว้ ห้ามปิด
 
@@ -225,9 +252,20 @@ http://localhost:4001/health
 ควรขึ้น `{"ok":true,"message":"bridge-server is running"}`
 
 **Terminal B — เปิด cloudflared ชี้ไปที่พอร์ตของ bridge:**
+
+
+
+
+
+
 ```
 cloudflared tunnel --url http://localhost:4001
 ```
+
+
+
+
+
 ไม่ต้อง cd ไปไหนก่อนก็ได้ รันแล้วจะมีข้อความยาวๆ ขึ้นมา ให้หาบรรทัดที่มี
 URL ลักษณะแบบนี้ (อยู่ใต้ "Your quick Tunnel has been created!"):
 ```

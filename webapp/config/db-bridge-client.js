@@ -31,6 +31,44 @@ if (!BRIDGE_URL || !BRIDGE_KEY) {
 // เดิมใน connectTimeout ของ mysql-pool.js เตือนไว้เรื่อง tunnel latency)
 const FETCH_TIMEOUT_MS = 20000;
 
+// [Fix] รูปภาพขึ้นเป็นกล่องดำ (broken image) ทุกครั้งที่รันโหมด bridge —
+// สาเหตุ: bridge-server.js ดึง image_data (LONGBLOB) ออกมาจาก MySQL
+// เป็น Buffer จริง แต่พอ res.json({ rows, ... }) ส่งกลับมา
+// JSON.stringify(Buffer) จะแปลง Buffer เป็น
+// { type: "Buffer", data: [137, 80, 78, ...] } โดยอัตโนมัติ (พฤติกรรม
+// มาตรฐานของ Node) — พอฝั่งนี้ response.json() กลับมา ได้แค่ plain
+// object รูปแบบนั้น ไม่ใช่ Buffer อีกต่อไป แล้วพอ server.js เรียก
+// res.send(rows[0].image_data) ก็เลยส่ง JSON text ออกไปแทนไฟล์รูปจริง
+// แม้จะตั้ง Content-Type เป็น image/jpeg ไว้แล้วก็ตาม
+//
+// ฟังก์ชันนี้ไล่ทุก field ใน object/array แบบ recursive แล้วแปลง
+// { type: "Buffer", data: [...] } กลับเป็น Buffer จริงก่อนส่งต่อให้
+// route files ใช้งาน — ทำที่จุดเดียวตรงนี้ ครอบคลุมทุก column ทุก query
+// ที่อาจมี BLOB ปนอยู่ (image_data ตอนนี้ และคอลัมน์ BLOB อื่นในอนาคต)
+// โดยไม่ต้องรู้ล่วงหน้าว่า column ไหนเป็น BLOB บ้าง
+function reviveBuffers(value) {
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i += 1) {
+      value[i] = reviveBuffers(value[i]);
+    }
+    return value;
+  }
+  if (value && typeof value === "object") {
+    if (
+      value.type === "Buffer" &&
+      Array.isArray(value.data) &&
+      Object.keys(value).length === 2
+    ) {
+      return Buffer.from(value.data);
+    }
+    for (const key of Object.keys(value)) {
+      value[key] = reviveBuffers(value[key]);
+    }
+    return value;
+  }
+  return value;
+}
+
 async function bridgeFetch(path, body) {
   if (!BRIDGE_URL || !BRIDGE_KEY) {
     throw new Error("DB_BRIDGE_URL / DB_BRIDGE_KEY ยังไม่ได้ตั้งค่า");
@@ -63,6 +101,14 @@ async function bridgeFetch(path, body) {
     data = await response.json();
   } catch (err) {
     throw new Error(`bridge ตอบกลับไม่ใช่ JSON ที่ถูกต้อง (${path}): ${err.message}`);
+  }
+
+  // แปลง { type: "Buffer", data: [...] } กลับเป็น Buffer จริงก่อนใช้งาน
+  // ต่อ (ดูคอมเมนต์ที่ reviveBuffers ด้านบน) — ทำหลัง parse JSON เสมอ
+  // ไม่ว่า endpoint ไหนจะถูกเรียก เพราะทั้ง /query และ /transaction/query
+  // อาจมี BLOB ปนมาในผลลัพธ์ได้เหมือนกัน
+  if (data && data.rows) {
+    reviveBuffers(data.rows);
   }
 
   if (!response.ok || !data.ok) {

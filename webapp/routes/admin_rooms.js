@@ -148,6 +148,17 @@ function attachImageUrl(room) {
   };
 }
 
+// [Fix] mysql2 คืนคอลัมน์ TINYINT(1)/BOOLEAN เป็น 0/1 (number) ไม่ใช่
+// true/false (boolean) เสมอไป — admin.js (frontend) เทียบด้วย strict
+// inequality `room.is_active !== false` ซึ่งเป็น true เสมอเมื่อค่าเป็น
+// เลข 0 (เพราะ 0 !== false ใน JS) ทำให้ปุ่ม "ปิดใช้งาน" กดสำเร็จจริงใน
+// DB แต่หน้าตารางไม่เคยแสดงผล "ปิดใช้งาน" เลย — บังคับแปลงเป็น boolean
+// แท้ๆ ตรงนี้ก่อนส่งออก กันปัญหาที่ต้นทาง เหมือนที่ keys.js ทำอยู่แล้ว
+function normalizeRoom(room) {
+  if (!room) return room;
+  return { ...room, is_active: !!room.is_active };
+}
+
 // -------------------------------------------------------------
 // GET /api/admin/rooms
 // -------------------------------------------------------------
@@ -156,7 +167,7 @@ router.get("/rooms", async (req, res) => {
     const [rows] = await query(
       `SELECT ${ROOM_LIST_COLUMNS} FROM room_tags ORDER BY room_name ASC`
     );
-    return res.json({ ok: true, rooms: rows.map(attachImageUrl) });
+    return res.json({ ok: true, rooms: rows.map((r) => attachImageUrl(normalizeRoom(r))) });
   } catch (err) {
     console.error("Admin list rooms error:", err.message);
     return res.status(500).json({ ok: false, message: "ดึงรายการห้อง/กุญแจไม่สำเร็จ" });
@@ -210,7 +221,7 @@ router.post("/rooms", async (req, res) => {
       [insertResult.insertId]
     );
 
-    return res.json({ ok: true, room: attachImageUrl(createdRows[0]) });
+    return res.json({ ok: true, room: attachImageUrl(normalizeRoom(createdRows[0])) });
   } catch (err) {
     console.error("Admin create room error:", err.message);
     return res.status(500).json({ ok: false, message: "สร้างห้อง/กุญแจไม่สำเร็จ" });
@@ -269,7 +280,7 @@ router.patch("/rooms/:id", async (req, res) => {
       [id]
     );
 
-    return res.json({ ok: true, room: attachImageUrl(updatedRows[0]) });
+    return res.json({ ok: true, room: attachImageUrl(normalizeRoom(updatedRows[0])) });
   } catch (err) {
     console.error("Admin update room error:", err.message);
     return res.status(500).json({ ok: false, message: "แก้ไขห้อง/กุญแจไม่สำเร็จ" });
@@ -305,7 +316,7 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
       [id]
     );
 
-    return res.json({ ok: true, room: attachImageUrl(updatedRows[0]) });
+    return res.json({ ok: true, room: attachImageUrl(normalizeRoom(updatedRows[0])) });
   } catch (err) {
     console.error("Admin upload room image error:", err.message);
     return res.status(500).json({ ok: false, message: "อัปโหลดรูปภาพไม่สำเร็จ" });
