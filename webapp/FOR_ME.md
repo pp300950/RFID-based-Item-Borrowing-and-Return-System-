@@ -63,25 +63,13 @@ insert into room_tags (room_name, tag_uid) values ('B103', '0058632534');
 ---
 
 ## 3. รันโปรเจกต์ (ทำทุกครั้งที่จะเปิดใช้งาน)
-
-
-
-
-
-
-
+เเต่ไม่ต้องรันบนคอมตอนใช้งานจริง
 ```
 cd RFID-based-Item-Borrowing-and-Return-System-
 cd webapp
 npm install
 npm start
 ```
-
-
-
-
-
-
 
 > `npm install` ไม่ต้องรันทุกครั้งก็ได้ถ้าไม่มีอะไรเปลี่ยน แต่รันซ้ำได้ไม่มีผลเสีย ปลอดภัยไว้ก่อน
 

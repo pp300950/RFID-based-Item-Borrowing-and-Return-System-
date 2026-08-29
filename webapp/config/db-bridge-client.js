@@ -69,12 +69,48 @@ function reviveBuffers(value) {
   return value;
 }
 
+// [Fix] แก้ปัญหาเดียวกันแต่คนละทิศทาง — reviveBuffers ด้านบนแก้ตอน
+// "อ่าน" (SELECT response ขากลับ) แล้ว แต่ตอน "เขียน" (INSERT/UPDATE
+// params ขาไป เช่นตอนอัปโหลดรูป req.file.buffer) ก็มีปัญหาเดียวกัน:
+// JSON.stringify(body) ที่ fetch() เรียกตอนส่ง request ออกไป จะแปลง
+// Buffer ใน params เป็น { type: "Buffer", data: [...] } เหมือนกัน แล้ว
+// พอ bridge-server.js parse JSON กลับมา ได้ params เป็น plain object
+// ไม่ใช่ Buffer — ส่งต่อให้ mysql2 ตรงๆ แบบนั้น mysql2 จะ format เป็น
+// SQL string literal "[object Object]" (ทดสอบแล้วด้วย mysql.format())
+// แทนที่จะเป็น binary จริง ทำให้รูปที่อัปโหลดผ่าน bridge เสียตั้งแต่
+// ตอนเขียนลง MySQL เลย ไม่ใช่แค่ตอนอ่านออกมา
+//
+// วิธีแก้: แปลง Buffer เป็น marker พิเศษ { __isBuffer: true, base64 }
+// ก่อน JSON.stringify ส่งออกไป (ใช้ base64 ไม่ใช่ array ตัวเลขเพื่อขนาด
+// payload เล็กกว่า ~25%) แล้วให้ bridge-server.js แปลงกลับเป็น Buffer
+// จริงก่อนส่งเข้า mysql2 (ดู bridge-server.js ฝั่งรับ)
+function encodeBuffersForTransport(value) {
+  if (Buffer.isBuffer(value)) {
+    return { __isBuffer: true, base64: value.toString("base64") };
+  }
+  if (Array.isArray(value)) {
+    return value.map(encodeBuffersForTransport);
+  }
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const key of Object.keys(value)) {
+      out[key] = encodeBuffersForTransport(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
 async function bridgeFetch(path, body) {
   if (!BRIDGE_URL || !BRIDGE_KEY) {
     throw new Error("DB_BRIDGE_URL / DB_BRIDGE_KEY ยังไม่ได้ตั้งค่า");
   }
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  // เข้ารหัส Buffer ใน body (เช่น params ที่มี req.file.buffer ตอน
+  // อัปโหลดรูป) ก่อน stringify เสมอ — ดูคอมเมนต์ encodeBuffersForTransport
+  const safeBody = encodeBuffersForTransport(body);
 
   let response;
   try {
@@ -84,7 +120,7 @@ async function bridgeFetch(path, body) {
         "Content-Type": "application/json",
         "X-Bridge-Key": BRIDGE_KEY,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(safeBody),
       signal: controller.signal,
     });
   } catch (err) {
