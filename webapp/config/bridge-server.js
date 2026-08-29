@@ -45,7 +45,14 @@ if (!AUTH_KEY) {
 }
 
 const app = express();
-app.use(express.json({ limit: "2mb" }));
+// [BLOB migration] limit เดิม 2mb ไม่พอสำหรับรูปภาพ — ตอนนี้รูปถูกส่ง
+// มาเป็นส่วนหนึ่งของ JSON body (Buffer ถูก JSON.stringify เป็น
+// { type: "Buffer", data: [...] } ซึ่งขยายขนาดจริงของไฟล์ขึ้นราว 3-4
+// เท่า) multer จำกัดไฟล์ไว้ที่ 5MB (ดู admin_rooms.js) ดังนั้น JSON
+// payload ที่ห่อ buffer 5MB อาจใหญ่ถึง ~20MB — ตั้ง limit ไว้ที่ 30mb
+// เผื่อ overhead เต็มที่ กัน request รูปภาพถูก reject แล้วไป timeout
+// อย่างที่เจอ (ดู README/comment ประกอบตอนแก้บั๊กนี้)
+app.use(express.json({ limit: "30mb" }));
 
 // -------------------------------------------------------------
 // Auth middleware — เช็คทุก request ก่อนแตะ MySQL เสมอ
