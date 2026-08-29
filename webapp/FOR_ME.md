@@ -91,11 +91,6 @@ npm uninstall @supabase/supabase-js
 - **jsonwebtoken** → ใช้กับ `middleware_auth.js` (auth ด้วย JWT)
 - **@supabase/supabase-js** → ถอดออกเพราะไม่ใช้ Supabase แล้ว
 
-
-สุดท้ายจบด้วย
-cd C:\Users\Administrator\RFID-based-Item-Borrowing-and-Return-System-\webapp
-npm start
-
 ถ้าตัดปัญหาด้านความปลอดภัยรัน
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ---
@@ -212,6 +207,7 @@ openssl rand -hex 32
 
 **Terminal A — รัน bridge-server.js:**
 ```
+cd RFID-based-Item-Borrowing-and-Return-System-
 cd webapp
 cd config
 node bridge-server.js
@@ -285,30 +281,3 @@ Render จะยิงไปหา URL เก่าที่ตายไปแ�
    (พิมพ์ผิดตัวเดียวก็จะขึ้น `401 unauthorized` ทันที)
 
 ---
-
-## 8. เซตอัปครั้งแรกบนเครื่องอื่น (เครื่องใหม่ที่ไม่เคยรันโปรเจกต์นี้มาก่อน)
-
-ใช้เช็กลิสต์นี้เวลาย้ายไปตั้งเครื่องใหม่ (เช่น เครื่องสำรอง หรือเครื่องที่
-โรงเรียนซื้อมาใหม่) ทำตามลำดับนี้ทั้งหมด — เรียงจากข้อ 1 ถึง 7 ห้ามข้าม:
-
-- [ ] **ข้อ 1** — ติดตั้ง Node.js เช็คด้วย `npm -v` / `node -v`
-- [ ] **ข้อ 2** — ติดตั้ง XAMPP, Start MySQL + Apache, สร้าง database
-      `key_borrow_db`, import `schema.sql`, รัน insert แท็กทั้งหมด
-- [ ] Clone/ดึงโค้ดโปรเจกต์มาไว้ในเครื่อง (จาก GitHub repo เดิม)
-- [ ] **ข้อ 4** — ติดตั้ง package เพิ่ม (`npm install` ในโฟลเดอร์ `webapp`
-      จะติดตั้งครบตาม `package.json` อยู่แล้ว ไม่ต้องรันทีละบรรทัดเอง
-      อีกก็ได้ถ้า `package.json` มีครบแล้ว)
-- [ ] **ข้อ 5** — สร้างไฟล์ `.env` เอง (คัดลอกจาก `.env.example` แล้วกรอก
-      ค่าจริง) **ไฟล์นี้ git ไม่เก็บให้ ต้องสร้างใหม่ทุกเครื่อง** และสร้าง
-      โฟลเดอร์ `public/uploads/room-images/`
-- [ ] **ข้อ 7** — ถ้าเครื่องนี้จะเป็นเครื่องหลักที่เปิดค้างไว้ให้ Render
-      ต่อด้วย: ติดตั้ง `cloudflared` (ข้อ 7.1) + ตั้งค่า `BRIDGE_PORT`/
-      `BRIDGE_AUTH_KEY` ใน `.env` (ข้อ 7.2) — ถ้าเครื่องนี้ใช้แค่ offline
-      ไม่ต้องทำข้อนี้
-- [ ] ถ้าเปลี่ยนเครื่องหลักที่เปิด bridge+cloudflared ไปใช้เครื่องนี้แทน
-      อย่าลืมเข้าไปแก้ค่า `DB_BRIDGE_URL` บน Render ให้เป็น URL
-      cloudflared ของเครื่องใหม่ด้วย (ไม่งั้นเว็บ Render ยังจะพยายามยิง
-      ไปที่เครื่องเก่าอยู่) และเช็คว่า `DB_BRIDGE_KEY` บน Render ยังตรง
-      กับ `BRIDGE_AUTH_KEY` ของเครื่องใหม่
-- [ ] **ข้อ 6** — รัน `npm start` แล้วเช็คทุก flow ตามลิสต์ทดสอบ (สมัครครู
-      → ยืม → คืน → ดูประวัติ → export → อัปโหลดรูป)

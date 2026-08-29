@@ -111,7 +111,12 @@ CREATE TABLE `room_tags` (
   `borrow_window_start` TIME NULL,
   `borrow_window_end` TIME NULL,
 
-  `image_url` TEXT NULL,
+  -- [BLOB migration] รูปภาพเก็บเป็น binary ตรงใน MySQL แทนไฟล์บนดิสก์
+  -- (image_url เดิม) เพราะดิสก์ของ Render เป็น ephemeral และคนละเครื่อง
+  -- กับ MySQL local — เก็บเป็น BLOB แล้ว query ผ่าน bridge ได้เหมือน
+  -- ข้อมูลอื่นทุกจุด ไม่ต้องพึ่ง path ไฟล์/tunnel URL อีกต่อไป
+  `image_data` LONGBLOB NULL,
+  `image_mime` VARCHAR(50) NULL,
 
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -145,7 +150,8 @@ DROP TABLE IF EXISTS `room_images`;
 CREATE TABLE `room_images` (
   `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
   `room_tag_id` BIGINT NOT NULL,
-  `image_url` TEXT NOT NULL,
+  `image_data` LONGBLOB NOT NULL,
+  `image_mime` VARCHAR(50) NOT NULL,
   `sort_order` INT NOT NULL DEFAULT 0,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT `fk_room_images_room_tag`
@@ -188,9 +194,8 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- -----------------------------------------------------------------
 
 -- -----------------------------------------------------------------
--- ไม่มี Supabase Storage bucket/policy ให้สร้าง — รูปภาพเก็บเป็นไฟล์
--- จริงบนดิสก์ที่ public/uploads/room-images/ แทน (ดู admin_rooms.js
--- เวอร์ชัน MySQL: multer diskStorage แทน memoryStorage) ต้องสร้าง
--- โฟลเดอร์นี้เองก่อนรัน server (หรือให้โค้ด fs.mkdirSync(...,
--- { recursive: true }) ตอน startup) — ไม่มีอะไรต้องทำในไฟล์ schema นี้
+-- ไม่มี Supabase Storage bucket/policy ให้สร้าง — รูปภาพเก็บเป็น BLOB
+-- ตรงในตาราง room_tags.image_data / room_images.image_data (ดูด้านบน)
+-- แทนไฟล์บนดิสก์ ไม่ต้องสร้างโฟลเดอร์ public/uploads/room-images/
+-- อีกต่อไป — ไม่มีอะไรต้องทำเพิ่มในไฟล์ schema นี้
 -- -----------------------------------------------------------------

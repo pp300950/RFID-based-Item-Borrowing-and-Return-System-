@@ -29,6 +29,7 @@ const cors = require("cors");
 const path = require("path");
 
 const { requireAuth, requireRole } = require("./routes/middleware_auth");
+const { query } = require("./config/db");
 
 const authRoutes = require("./routes/auth");
 const tapRoutes = require("./routes/tap");
@@ -64,6 +65,51 @@ app.use("/api", authRoutes);
 //   /api/tap, /api/tap/session, /api/tap/session/clear
 // -------------------------------------------------------------
 app.use("/api", tapRoutes);
+
+// -------------------------------------------------------------
+// [BLOB migration] รูปภาพห้อง — public, ไม่ต้อง login เพราะหน้า
+// keys.html (สถานะกุญแจ) เป็นหน้าสาธารณะที่ต้องโชว์รูปห้องด้วย
+// เดิมรูปเป็นไฟล์บนดิสก์เสิร์ฟผ่าน express.static(public/) ตรงๆ —
+// ตอนนี้เก็บเป็น LONGBLOB ใน MySQL แทน (ดู README/admin_rooms.js) จึง
+// ต้องมี route ดึงกลับมาเป็นไฟล์รูปให้ <img src="..."> ใช้ได้ตรงๆ
+// path คงรูปแบบเดิม /uploads/room-images/... ไว้ กัน frontend เดิม
+// ที่ผูก URL แบบนี้อยู่แล้วพัง (ดู public/*.html ถ้ามีจุดอ้างอิงตรงๆ
+// ต้องเปลี่ยนเป็น /uploads/room-images/room/:id หรือ
+// /uploads/room-images/multi/:imageId แทน path ไฟล์เดิม)
+// -------------------------------------------------------------
+app.get("/uploads/room-images/room/:id", async (req, res) => {
+  try {
+    const [rows] = await query(
+      `SELECT image_data, image_mime FROM room_tags WHERE id = ? LIMIT 1`,
+      [req.params.id]
+    );
+    if (rows.length === 0 || !rows[0].image_data) {
+      return res.status(404).json({ ok: false, message: "ไม่พบรูปภาพนี้" });
+    }
+    res.set("Content-Type", rows[0].image_mime || "image/jpeg");
+    return res.send(rows[0].image_data);
+  } catch (err) {
+    console.error("Public get room image error:", err.message);
+    return res.status(500).json({ ok: false, message: "ดึงรูปภาพไม่สำเร็จ" });
+  }
+});
+
+app.get("/uploads/room-images/multi/:imageId", async (req, res) => {
+  try {
+    const [rows] = await query(
+      `SELECT image_data, image_mime FROM room_images WHERE id = ? LIMIT 1`,
+      [req.params.imageId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, message: "ไม่พบรูปภาพนี้" });
+    }
+    res.set("Content-Type", rows[0].image_mime || "image/jpeg");
+    return res.send(rows[0].image_data);
+  } catch (err) {
+    console.error("Public get room images (multi) error:", err.message);
+    return res.status(500).json({ ok: false, message: "ดึงรูปภาพไม่สำเร็จ" });
+  }
+});
 
 // -------------------------------------------------------------
 // Keys routes — สาธารณะ ไม่ผ่าน requireAuth
