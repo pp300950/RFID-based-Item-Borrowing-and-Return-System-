@@ -38,11 +38,38 @@ const adminRoomsRoutes = require("./routes/admin_rooms");
 const adminTeachersRoutes = require("./routes/admin_teachers");
 const adminKeysRoutes = require("./routes/admin_keys");
 const exportRoutes = require("./routes/export");
+const lineWebhookRoutes = require("./routes/line_webhook");
+const adminLineRoutes = require("./routes/admin_line");
+const { runOverdueCheck } = require("./services/overdue_checker");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+
+// -------------------------------------------------------------
+// [LINE webhook] ต้อง mount ก่อน express.json() เสมอ เพราะการ verify
+// signature ของ LINE (x-line-signature header) ต้องคำนวณจาก raw body
+// ดิบๆ ก่อนถูก parse เป็น JSON object — ถ้า mount หลัง express.json()
+// จะไม่มี raw body ให้ใช้ตรวจสอบแล้ว (req.body จะถูกแปลงเป็น object
+// ไปแล้ว) จึงต้องใช้ express.raw() เฉพาะ path นี้ แล้วค่อย parse JSON
+// เองในไฟล์ route (ดู routes/line_webhook.js ที่ใช้ req.rawBody)
+// -------------------------------------------------------------
+app.use(
+  "/api/line/webhook",
+  express.raw({ type: "*/*" }),
+  (req, res, next) => {
+    req.rawBody = req.body; // เก็บ Buffer ดิบไว้ verify signature
+    try {
+      req.body = req.body.length ? JSON.parse(req.body.toString("utf8")) : {};
+    } catch (err) {
+      console.error("LINE webhook: parse JSON body ไม่สำเร็จ:", err.message);
+      req.body = {};
+    }
+    next();
+  }
+);
+
 app.use(express.json());
 
 // -------------------------------------------------------------
@@ -65,6 +92,13 @@ app.use("/api", authRoutes);
 //   /api/tap, /api/tap/session, /api/tap/session/clear
 // -------------------------------------------------------------
 app.use("/api", tapRoutes);
+
+// -------------------------------------------------------------
+// [LINE webhook] รับ event จาก LINE (join กลุ่ม, leave กลุ่ม ฯลฯ)
+// public เช่นกัน เพราะ LINE server เป็นผู้ยิงมาตรง ไม่ใช่ user ที่ login
+// ผ่านเว็บ ความปลอดภัยอยู่ที่การ verify signature ข้างในไฟล์ route แทน
+// -------------------------------------------------------------
+app.use("/api", lineWebhookRoutes);
 
 // -------------------------------------------------------------
 // [BLOB migration] รูปภาพห้อง — public, ไม่ต้อง login เพราะหน้า
@@ -153,6 +187,15 @@ app.use(
   requireRole("admin"),
   exportRoutes
 );
+// admin_line.js ก็เข้ากลุ่ม requireAuth + requireRole("admin") เดียวกัน
+// นี้ด้วย — เช็คโควต้า LINE / ดูรายการกลุ่มเป็นข้อมูลที่แอดมินเท่านั้น
+// ควรเห็น
+app.use(
+  "/api/admin",
+  requireAuth,
+  requireRole("admin"),
+  adminLineRoutes
+);
 
 // -------------------------------------------------------------
 // Fallback: ให้ทุกเส้นทางที่ไม่ตรง static file ตกไปที่ login.html
@@ -169,3 +212,31 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+// -------------------------------------------------------------
+// [LINE notify] Cron เช็คกุญแจเกินเวลาคืน — ค่า default ทุก 15 นาที
+// ปรับได้ผ่าน env OVERDUE_CHECK_CRON (รูปแบบ cron expression มาตรฐาน
+// 5 ช่อง เช่น "*/30 * * * *" = ทุก 30 นาที) — รันบน process เดียวกับ
+// เว็บ (Render Web Service เดียวกัน) ไม่ต้องแยก worker
+//
+// หมายเหตุ: cron นี้ทำงานได้ก็ต่อเมื่อ process นี้ (Render) ยังต่อ
+// ฐานข้อมูลผ่าน bridge ได้อยู่ (เครื่อง local + bridge-server.js ต้อง
+// เปิดค้างไว้ตาม README section 11) ถ้า bridge ล่ม cron จะ log error
+// ทุกรอบแต่ไม่ทำให้ตัวเว็บล่มตาม (query() จะ throw แล้วถูก catch ใน
+// runOverdueCheck เอง)
+// -------------------------------------------------------------
+const cron = require("node-cron");
+const OVERDUE_CHECK_CRON = process.env.OVERDUE_CHECK_CRON || "*/15 * * * *";
+
+if (cron.validate(OVERDUE_CHECK_CRON)) {
+  cron.schedule(OVERDUE_CHECK_CRON, () => {
+    runOverdueCheck().catch((err) =>
+      console.error("Cron runOverdueCheck ล้มเหลว:", err.message)
+    );
+  });
+  console.log(`[cron] ตั้งเวลาตรวจกุญแจเกินเวลาคืนแล้ว: "${OVERDUE_CHECK_CRON}"`);
+} else {
+  console.error(
+    `[cron] OVERDUE_CHECK_CRON ไม่ใช่ cron expression ที่ถูกต้อง: "${OVERDUE_CHECK_CRON}" — ปิดการเช็คเกินเวลาไว้ก่อน`
+  );
+}

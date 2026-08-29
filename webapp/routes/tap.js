@@ -46,6 +46,7 @@ const {
   getPendingRegistration,
   resolveRegistration,
 } = require("./register_session");
+const { sendGroupMessage, buildBorrowedMessage } = require("../services/line_notify");
 
 const SESSION_TTL_MS = 20 * 1000; // 20 วินาที นับจากการแตะล่าสุด (ครูหรือกุญแจ)
 
@@ -403,6 +404,27 @@ router.post("/tap", async (req, res) => {
       await query(
         `INSERT INTO key_logs (room_tag_id, teacher_id, action) VALUES (?, ?, 'borrow')`,
         [roomTag.id, session.teacherId]
+      );
+
+      // -----------------------------------------------------------
+      // [LINE notify] แจ้งเตือนเข้ากลุ่มทันทีตอนยืมสำเร็จ — เรียกแบบ
+      // "fire-and-forget" (ไม่ await ใน critical path, .catch กันเงียบๆ)
+      // เพื่อไม่ให้ /api/tap ตอบช้าหรือ error ไปด้วยแค่เพราะ LINE ส่งไม่
+      // ผ่าน (เช่น เน็ตหลุด, โควต้าหมด) — ธุรกรรมยืมกุญแจถือว่าสำเร็จ
+      // แล้วตั้งแต่ก่อนบรรทัดนี้ ไม่เกี่ยวกับผลของการแจ้งเตือน
+      // -----------------------------------------------------------
+      const nowStr = new Date().toLocaleTimeString("th-TH", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      sendGroupMessage(
+        buildBorrowedMessage({
+          teacherName: session.teacherName,
+          roomName: roomTag.room_name,
+          time: nowStr,
+        })
+      ).catch((err) =>
+        console.error("tap.js: sendGroupMessage (borrowed) ล้มเหลว:", err.message)
       );
 
       return res.json({
