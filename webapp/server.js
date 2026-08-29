@@ -41,6 +41,7 @@ const exportRoutes = require("./routes/export");
 const lineWebhookRoutes = require("./routes/line_webhook");
 const adminLineRoutes = require("./routes/admin_line");
 const { runOverdueCheck } = require("./services/overdue_checker");
+const { sendGroupMessage, buildServerReadyMessage } = require("./services/line_notify");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -211,6 +212,21 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+
+  // -----------------------------------------------------------
+  // [LINE notify] แจ้งเข้ากลุ่มทันทีที่ server เริ่มทำงานสำเร็จ — เรียก
+  // แบบ fire-and-forget เหมือนจุดอื่นๆ (ไม่ await, .catch กันเงียบๆ)
+  // เพื่อไม่ให้ error จาก LINE (เช่น ยังไม่ได้ตั้งค่ากลุ่ม, โควต้าหมด)
+  // ไปหยุดหรือทำให้ server ค้างตอน start — ธุรกิจหลัก (ยืม/คืนกุญแจ)
+  // ทำงานได้ปกติไม่ว่าข้อความนี้จะส่งสำเร็จหรือไม่
+  //
+  // หมายเหตุ: Render จะ restart process นี้ทุกครั้งที่ deploy ใหม่หรือ
+  // service sleep แล้วตื่นขึ้นมา (ถ้าใช้ free plan) ดังนั้นข้อความนี้จะ
+  // เด้งเข้ากลุ่มค่อนข้างบ่อยตามจังหวะ deploy/restart ไม่ใช่วันละครั้ง
+  // -----------------------------------------------------------
+  sendGroupMessage(buildServerReadyMessage()).catch((err) =>
+    console.error("server.js: sendGroupMessage (server ready) ล้มเหลว:", err.message)
+  );
 });
 
 // -------------------------------------------------------------

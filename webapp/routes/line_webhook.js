@@ -9,8 +9,9 @@
 //     env — ถ้าตั้ง env ไว้ระบบจะใช้ env ก่อนเสมอ ดู line_notify.js)
 //   - event "leave" (บอทถูกเตะ/ออกจากกลุ่ม) -> mark is_active = 0 ใน
 //     line_targets กันยิงข้อความไปกลุ่มที่บอทไม่ได้อยู่แล้ว
-//   - event อื่นๆ (message, memberJoined ฯลฯ) -> log ไว้เฉยๆ ไม่ต้องทำ
-//     อะไรต่อ เพราะระบบนี้ไม่มี flow ให้ครูคุยกับบอทกลับ
+//   - event "message" ที่เป็นข้อความ "/quota" -> ตอบกลับโควต้าข้อความ
+//     LINE OA เดือนนี้ทันทีในกลุ่ม (ผ่าน Reply API ไม่เสียโควต้า push)
+//     ข้อความอื่นนอกจากนี้แค่ log ไว้เฉยๆ ไม่ตอบกลับ
 //
 // ตั้งค่าที่ต้องทำใน LINE Developers Console:
 //   Messaging API -> Webhook settings -> Webhook URL ใส่
@@ -26,6 +27,11 @@ const express = require("express");
 const crypto = require("crypto");
 const router = express.Router();
 const { query } = require("../config/db");
+const {
+  replyMessage,
+  getMessageQuota,
+  buildQuotaReplyMessage,
+} = require("../services/line_notify");
 
 // -------------------------------------------------------------
 // ต้องใช้ raw body (ไม่ใช่ JSON ที่ parse แล้ว) ในการคำนวณ signature
@@ -120,8 +126,32 @@ async function handleEvent(event) {
     return;
   }
 
-  // event ประเภทอื่น (message, memberJoined, memberLeft ฯลฯ) — แค่ log
-  // ไว้เผื่อ debug ไม่ต้องทำอะไรต่อ
+  // -----------------------------------------------------------
+  // event "message" ประเภทข้อความตัวหนังสือ — ใช้กับคำสั่ง "/quota"
+  // พิมพ์ในกลุ่มแล้วบอทตอบโควต้ากลับทันที (ใช้ Reply API ไม่เสียโควต้า
+  // push รายเดือน) คำสั่งอื่นนอกจากนี้ไม่ตอบอะไร ปล่อยผ่านเฉยๆ
+  // -----------------------------------------------------------
+  if (event.type === "message" && event.message?.type === "text") {
+    const text = (event.message.text || "").trim().toLowerCase();
+
+    if (text === "/quota") {
+      const quotaResult = await getMessageQuota();
+      const replyText = buildQuotaReplyMessage(quotaResult);
+      const result = await replyMessage(event.replyToken, replyText);
+      if (!result.ok) {
+        console.error("LINE webhook: ตอบ /quota ไม่สำเร็จ:", result.message);
+      }
+      return;
+    }
+
+    // ข้อความอื่นๆ — log ไว้เฉยๆ ไม่ตอบกลับ (ระบบนี้ไม่มี flow ให้ครูคุย
+    // กับบอทแบบอื่น)
+    console.log(`[LINE webhook] ข้อความในกลุ่ม/แชท: "${event.message.text}"`);
+    return;
+  }
+
+  // event ประเภทอื่น (memberJoined, memberLeft ฯลฯ) — แค่ log ไว้เผื่อ
+  // debug ไม่ต้องทำอะไรต่อ
   console.log(`[LINE webhook] event: ${event.type} จาก source: ${source.type}`);
 }
 

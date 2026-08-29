@@ -2,8 +2,11 @@
 // -----------------------------------------------------------------
 // รวมฟังก์ชันที่คุยกับ LINE Messaging API ทั้งหมดไว้ที่เดียว:
 //   - sendGroupMessage(text)   ส่งข้อความ (push) เข้ากลุ่มเป้าหมาย
+//   - replyMessage(replyToken, text)  ตอบกลับข้อความที่มีคนพิมพ์มา
+//        (ใช้กับฟีเจอร์ "/quota" พิมพ์ในกลุ่มแล้วบอทตอบกลับ)
 //   - getMessageQuota()        เช็คโควต้าข้อความรายเดือน + ใช้ไปแล้วเท่าไร
-//   - buildBorrowedMessage(...) / buildOverdueMessage(...)
+//   - buildBorrowedMessage(...) / buildOverdueMessage(...) /
+//     buildServerReadyMessage(...) / buildQuotaReplyMessage(...)
 //         ฟังก์ชันช่วยประกอบข้อความให้ข้อความหน้าตาตรงกันทุกจุดที่เรียก
 //
 // วิธีหา LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET (ครั้งแรก):
@@ -22,9 +25,9 @@
 //      ก็อปไปตั้งเป็น env var นี้ (หรือปล่อยว่างแล้วให้ระบบ auto-save
 //      ลงตาราง line_targets ก็ได้ ดูคอมเมนต์ใน line_webhook.js)
 //
-// หมายเหตุสำคัญ: บอทต้อง "join กลุ่มได้" ก่อน — เปิดที่ LINE Official
-// Account Manager -> Settings -> Bot settings ตั้ง เข้าร่วมกลุ่มแชท:
-// "อนุญาต" ไม่งั้นเชิญบอทเข้ากลุ่มไม่ติด
+// หมายเหตุสำคัญ: บอทต้อง "join กลุ่มได้" ก่อน — เปิดที่ LINE Developers
+// Console -> Messaging API -> "Allow bot to join group chats" ต้องเป็น
+// Enable ไม่งั้นเชิญบอทเข้ากลุ่มไม่ติด (จะถูกเตะออกเองทันที)
 // -----------------------------------------------------------------
 
 const LINE_API_BASE = "https://api.line.me/v2/bot";
@@ -66,9 +69,8 @@ async function resolveTargetId() {
 // -------------------------------------------------------------
 // sendGroupMessage(text) -> Promise<{ ok: boolean, message?: string }>
 // ส่ง push message ไปยังกลุ่มเป้าหมาย (LINE_GROUP_ID หรือจาก DB)
-// ออกแบบให้ "ไม่ throw" ออกไปทำลาย flow หลัก (ยืม/คืน) — เรียกแบบ
-// fire-and-forget แล้ว log error เองถ้าพัง ไม่ควรทำให้ /api/tap ตอบช้า
-// หรือ error ไปด้วยแค่เพราะ LINE ส่งไม่ผ่าน
+// ออกแบบให้ "ไม่ throw" ออกไปทำลาย flow หลัก (ยืม/คืน/server start) —
+// เรียกแบบ fire-and-forget แล้ว log error เองถ้าพัง
 // -------------------------------------------------------------
 async function sendGroupMessage(text) {
   try {
@@ -110,9 +112,46 @@ async function sendGroupMessage(text) {
 }
 
 // -------------------------------------------------------------
-// getMessageQuota() -> Promise<{ ok, type?, value?, totalUsage? }>
+// replyMessage(replyToken, text) -> Promise<{ ok, message? }>
+// ตอบกลับข้อความที่มีคนพิมพ์มาในกลุ่ม (ใช้ Reply API ไม่ใช่ Push API)
+// ต่างจาก sendGroupMessage ตรงที่ "ไม่เสียโควต้ารายเดือน" (LINE ไม่นับ
+// reply message เข้าโควต้า push/broadcast) และต้องใช้ภายใน 1 นาทีนับ
+// จากได้รับ event เท่านั้น (replyToken หมดอายุเร็ว) — ใช้กับฟีเจอร์
+// พิมพ์ "/quota" ในกลุ่มแล้วบอทตอบกลับทันที
+// -------------------------------------------------------------
+async function replyMessage(replyToken, text) {
+  try {
+    const token = getAccessToken();
+
+    const resp = await fetch(`${LINE_API_BASE}/message/reply`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        replyToken,
+        messages: [{ type: "text", text }],
+      }),
+    });
+
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => "");
+      console.error(`replyMessage: LINE API ตอบ ${resp.status} — ${errBody}`);
+      return { ok: false, message: `LINE API error ${resp.status}` };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.error("replyMessage error:", err.message);
+    return { ok: false, message: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// getMessageQuota() -> Promise<{ ok, type?, limit?, used?, remaining? }>
 // เช็คโควต้าข้อความรายเดือนของ LINE OA (แผนฟรีจำกัดจำนวนข้อความ push/
-// broadcast ต่อเดือน) รวม 2 เรียก:
+// broadcast ต่อเดือน — ปกติ 300 ข้อความ/เดือน) รวม 2 เรียก:
 //   GET /message/quota        -> โควต้าทั้งหมดที่ได้ (type, value)
 //   GET /message/quota/consumption -> ใช้ไปแล้วเท่าไรในเดือนนี้
 // -------------------------------------------------------------
@@ -172,10 +211,45 @@ function buildOverdueMessage({ teacherName, roomName, dueTime }) {
   );
 }
 
+// -------------------------------------------------------------
+// buildServerReadyMessage() — ข้อความแจ้งตอน server เริ่มทำงานสำเร็จ
+// เรียกจาก server.js ตอน app.listen(...) callback
+// -------------------------------------------------------------
+function buildServerReadyMessage({ time } = {}) {
+  const t = time || new Date().toLocaleString("th-TH", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  return `✅ ระบบยืม-คืนกุญแจพร้อมทำงานแล้ว\nเวลาเริ่มทำงาน: ${t}`;
+}
+
+// -------------------------------------------------------------
+// buildQuotaReplyMessage(quotaResult) — ประกอบข้อความตอบกลับ "/quota"
+// รับผลลัพธ์จาก getMessageQuota() มาแปลงเป็นข้อความอ่านง่ายส่งกลับกลุ่ม
+// -------------------------------------------------------------
+function buildQuotaReplyMessage(quotaResult) {
+  if (!quotaResult.ok) {
+    return `⚠️ เช็คโควต้า LINE ไม่สำเร็จ: ${quotaResult.message || "ไม่ทราบสาเหตุ"}`;
+  }
+
+  if (quotaResult.type === "none" || quotaResult.limit == null) {
+    return `📊 โควต้าข้อความ LINE: ไม่จำกัด (ใช้ไปแล้ว ${quotaResult.used} ข้อความเดือนนี้)`;
+  }
+
+  return (
+    `📊 โควต้าข้อความ LINE เดือนนี้\n` +
+    `ใช้ไปแล้ว: ${quotaResult.used} / ${quotaResult.limit} ข้อความ\n` +
+    `คงเหลือ: ${quotaResult.remaining} ข้อความ`
+  );
+}
+
 module.exports = {
   sendGroupMessage,
+  replyMessage,
   getMessageQuota,
   buildBorrowedMessage,
   buildOverdueMessage,
+  buildServerReadyMessage,
+  buildQuotaReplyMessage,
   resolveTargetId,
 };
