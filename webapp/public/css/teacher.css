@@ -242,13 +242,23 @@
     position: relative;
     width: 100%;
     aspect-ratio: 4 / 3;
+    overflow: hidden; /* กันรูปข้างในดันความสูง wrap ออก ถ้า aspect-ratio
+                          ใช้ไม่ได้ผลเต็มที่ (browser เก่า/ถูก override) —
+                          รูปจะถูกตัดตามกรอบแทนที่จะดันการ์ดให้สูงเกิน */
     background: var(--panel-2);
     flex-shrink: 0;
   }
   
+  /* ใช้ !important เพราะ style.css มีกฎ global "img { height: auto; }"
+     (บรรทัด ~38 ของ style.css กันรูปทั่วระบบไม่ให้ยืดเกิน container) ซึ่ง
+     ชนะ .item-card-image ตรงนี้ในบาง browser/cache ทำให้รูปห้องสูงเท่า
+     ไฟล์จริงแทนที่จะถูกตัดตาม aspect-ratio 4:3 ของ .item-card-image-wrap
+     (ดูปัญหาการ์ดสูงไม่เท่ากันเวลามีรูป vs ไม่มีรูป) — !important ที่นี่
+     บังคับให้รูปการ์ดกุญแจสูงเท่ากรอบเสมอ ไม่กระทบรูปอื่นในระบบเพราะ
+     เจาะจงแค่ class .item-card-image เท่านั้น */
   .item-card-image {
     width: 100%;
-    height: 100%;
+    height: 100% !important;
     object-fit: cover;
     display: block;
   }
