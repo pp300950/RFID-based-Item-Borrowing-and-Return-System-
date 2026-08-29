@@ -65,6 +65,7 @@ insert into room_tags (room_name, tag_uid) values ('B103', '0058632534');
 ## 3. รันโปรเจกต์ (ทำทุกครั้งที่จะเปิดใช้งาน)
 
 ```
+cd RFID-based-Item-Borrowing-and-Return-System-
 cd webapp
 npm install
 npm start

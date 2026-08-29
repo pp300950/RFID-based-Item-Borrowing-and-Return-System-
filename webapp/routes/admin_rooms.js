@@ -134,6 +134,20 @@ const ROOM_LIST_COLUMNS = `
   (image_data IS NOT NULL) AS has_image
 `;
 
+// [Fix] admin.js (frontend) คาดหวัง field ชื่อ image_url ในทุก response
+// ของห้อง (ดู admin.js บรรทัด room.image_url) แต่ query ข้างบนส่งแค่
+// has_image (boolean) มา — ไม่มี field ไหนสร้าง URL ให้ frontend ใช้
+// render <img src="..."> เลย ทำให้รูปไม่เคยขึ้นแม้จะอัปโหลดสำเร็จแล้ว
+// ก็ตาม ฟังก์ชันนี้แปลง has_image -> image_url ให้ตรงกับ public route
+// GET /uploads/room-images/room/:id ที่มีอยู่แล้วใน server.js
+function attachImageUrl(room) {
+  if (!room) return room;
+  return {
+    ...room,
+    image_url: room.has_image ? `/uploads/room-images/room/${room.id}` : null,
+  };
+}
+
 // -------------------------------------------------------------
 // GET /api/admin/rooms
 // -------------------------------------------------------------
@@ -142,7 +156,7 @@ router.get("/rooms", async (req, res) => {
     const [rows] = await query(
       `SELECT ${ROOM_LIST_COLUMNS} FROM room_tags ORDER BY room_name ASC`
     );
-    return res.json({ ok: true, rooms: rows });
+    return res.json({ ok: true, rooms: rows.map(attachImageUrl) });
   } catch (err) {
     console.error("Admin list rooms error:", err.message);
     return res.status(500).json({ ok: false, message: "ดึงรายการห้อง/กุญแจไม่สำเร็จ" });
@@ -196,7 +210,7 @@ router.post("/rooms", async (req, res) => {
       [insertResult.insertId]
     );
 
-    return res.json({ ok: true, room: createdRows[0] });
+    return res.json({ ok: true, room: attachImageUrl(createdRows[0]) });
   } catch (err) {
     console.error("Admin create room error:", err.message);
     return res.status(500).json({ ok: false, message: "สร้างห้อง/กุญแจไม่สำเร็จ" });
@@ -255,7 +269,7 @@ router.patch("/rooms/:id", async (req, res) => {
       [id]
     );
 
-    return res.json({ ok: true, room: updatedRows[0] });
+    return res.json({ ok: true, room: attachImageUrl(updatedRows[0]) });
   } catch (err) {
     console.error("Admin update room error:", err.message);
     return res.status(500).json({ ok: false, message: "แก้ไขห้อง/กุญแจไม่สำเร็จ" });
@@ -291,7 +305,7 @@ router.post("/rooms/:id/image", upload.single("image"), async (req, res) => {
       [id]
     );
 
-    return res.json({ ok: true, room: updatedRows[0] });
+    return res.json({ ok: true, room: attachImageUrl(updatedRows[0]) });
   } catch (err) {
     console.error("Admin upload room image error:", err.message);
     return res.status(500).json({ ok: false, message: "อัปโหลดรูปภาพไม่สำเร็จ" });
@@ -388,7 +402,15 @@ router.post("/rooms/:id/images", upload.array("images", MAX_IMAGES_PER_UPLOAD), 
       return rows;
     });
 
-    return res.json({ ok: true, images: createdRows });
+    // [Fix] เติม image_url ให้ตรงกับ public route
+    // GET /uploads/room-images/multi/:imageId — admin.js ใช้ img.image_url
+    // ตอน render <img> ในโมดัลจัดการรูปหลายรูป (renderManagedImagesGrid)
+    const imagesWithUrl = createdRows.map((img) => ({
+      ...img,
+      image_url: `/uploads/room-images/multi/${img.id}`,
+    }));
+
+    return res.json({ ok: true, images: imagesWithUrl });
   } catch (err) {
     console.error("Admin add room images error:", err.message);
     return res.status(500).json({ ok: false, message: "อัปโหลดรูปภาพไม่สำเร็จ" });
@@ -498,7 +520,13 @@ router.patch("/rooms/:id/images/reorder", async (req, res) => {
 
     updatedRows.sort((a, b) => a.sort_order - b.sort_order);
 
-    return res.json({ ok: true, images: updatedRows });
+    // [Fix] เติม image_url ให้ครบเหมือน endpoint อื่นๆ ของ room_images
+    const imagesWithUrl = updatedRows.map((img) => ({
+      ...img,
+      image_url: `/uploads/room-images/multi/${img.id}`,
+    }));
+
+    return res.json({ ok: true, images: imagesWithUrl });
   } catch (err) {
     console.error("Admin reorder room images error:", err.message);
     return res.status(500).json({ ok: false, message: "จัดลำดับรูปภาพไม่สำเร็จ" });

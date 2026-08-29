@@ -50,10 +50,14 @@ function parseBorrowWindowDays(value) {
 // -------------------------------------------------------------
 router.get("/keys/status", async (req, res) => {
   try {
+    // [BLOB migration] รูปภาพเก็บเป็น image_data (LONGBLOB) ในตารางแล้ว
+    // ไม่มีคอลัมน์ image_url อีกต่อไป — ดึง has_image (boolean) มาแทน
+    // แล้วค่อยประกอบเป็น URL ของ public route (/uploads/room-images/room/:id)
+    // ในโค้ด JS ด้านล่าง เหมือนที่ admin_rooms.js ทำกับ ROOM_LIST_COLUMNS
     const [roomRows] = await query(
       `SELECT
          rt.id, rt.room_name, rt.tag_uid, rt.description, rt.is_active,
-         rt.status, rt.borrowed_at, rt.image_url,
+         rt.status, rt.borrowed_at, (rt.image_data IS NOT NULL) AS has_image,
          rt.borrow_window_days, rt.borrow_window_start, rt.borrow_window_end,
          t.id AS borrower_id, t.name AS borrower_name, t.department AS borrower_department
        FROM room_tags rt
@@ -64,10 +68,13 @@ router.get("/keys/status", async (req, res) => {
 
     const roomIds = roomRows.map((r) => r.id);
 
+    // [BLOB migration] room_images ก็ไม่มีคอลัมน์ image_url เหมือนกันแล้ว
+    // (เก็บเป็น image_data LONGBLOB) — ประกอบ URL จาก id แทน ให้ตรงกับ
+    // public route GET /uploads/room-images/multi/:imageId ใน server.js
     let imagesByRoomId = new Map();
     if (roomIds.length > 0) {
       const [imageRows] = await query(
-        `SELECT id, room_tag_id, image_url, sort_order
+        `SELECT id, room_tag_id, sort_order
          FROM room_images
          WHERE room_tag_id IN (?)
          ORDER BY sort_order ASC`,
@@ -79,7 +86,7 @@ router.get("/keys/status", async (req, res) => {
         if (!imagesByRoomId.has(img.room_tag_id)) imagesByRoomId.set(img.room_tag_id, []);
         imagesByRoomId.get(img.room_tag_id).push({
           id: img.id,
-          image_url: img.image_url,
+          image_url: `/uploads/room-images/multi/${img.id}`,
           sort_order: img.sort_order,
         });
       }
@@ -93,7 +100,8 @@ router.get("/keys/status", async (req, res) => {
       is_active: !!r.is_active,
       status: r.status,
       borrowed_at: r.borrowed_at,
-      image_url: r.image_url,
+      // ประกอบ URL จาก has_image แทนคอลัมน์ image_url เดิมที่ไม่มีแล้ว
+      image_url: r.has_image ? `/uploads/room-images/room/${r.id}` : null,
       borrow_window_days: parseBorrowWindowDays(r.borrow_window_days),
       borrow_window_start: r.borrow_window_start,
       borrow_window_end: r.borrow_window_end,
