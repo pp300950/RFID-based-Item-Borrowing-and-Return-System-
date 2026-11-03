@@ -17,7 +17,7 @@
 const express = require("express");
 const router = express.Router();
 const { query } = require("../config/db");
-const { signToken, requireAuth } = require("../middleware/auth");
+const { signToken, requireAuth } = require("./middleware_auth");
 
 // =================================================================
 // ครู — สมัครด้วยการกรอกรหัสประจำตัว (ไม่มี login ผ่านเว็บ)
