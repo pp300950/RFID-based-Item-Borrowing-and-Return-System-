@@ -1,29 +1,37 @@
 /* =================================================================
    Design tokens
    -----------------------------------------------------------------
-   Color:
-     --ink        #1C2128   พื้นหลังหลัก โทนกราไฟต์เข้ม
-     --panel      #262B33   พื้นการ์ด
-     --panel-2    #2E343D   พื้นช่อง input
-     --teal       #3E9C8F   accent หลัก (สมัครครู/แท็ก/สแกน)
-     --amber      #E8A33D   accent แอดมิน
-     --violet     #8B7FD1   accent ครู
-     --ink-line   #3A4048   เส้นแบ่ง/ขอบ
-     --text-hi    #EDEDED   ตัวอักษรหลัก
-     --text-mid   #AEB4BC   ตัวอักษรรอง
-     --text-low   #6E7580   ตัวอักษรจาง (hint)
+   Color: ธีม "วิทยาลัยเทคโนโลยีชลบุรี" — แดง-ขาว ตามโลโก้สถาบัน
+     --ink        #1C1416   พื้นหลังหลัก โทนเข้มออกแดงเล็กน้อย (ไม่ดำสนิท
+                            เพื่อให้สีแดงของโลโก้/accent เด่นขึ้น)
+     --panel      #241A1C   พื้นการ์ด
+     --panel-2    #2C2022   พื้นช่อง input
+     --red        #D81F26   accent หลัก (สมัครครู/แท็ก/สแกน/ปุ่มหลัก) —
+                            อ้างอิงจากสีแดงในโลโก้วิทยาลัยโดยตรง
+     --red-dark   #A4161C   แดงเข้ม ใช้กับ hover/เส้นเน้นรอง
+     --white      #F5F1EC   accent ขาว (แอดมิน/รายละเอียดรอง) — ออกครีม
+                            นิดๆ ไม่ใช่ขาวจัด ให้กลมกลืนกับพื้นเข้ม
+     --ink-line   #3D2C2F   เส้นแบ่ง/ขอบ
+     --text-hi    #FAF7F3   ตัวอักษรหลัก
+     --text-mid   #C9BDB8   ตัวอักษรรอง
+     --text-low   #8A7A76   ตัวอักษรจาง (hint)
 
    Type:
      Display/label : 'IBM Plex Mono'      (ให้ความรู้สึกบัตร/ตั๋ว/รหัส)
      Body          : 'IBM Plex Sans Thai' (อ่านง่าย รองรับภาษาไทย)
 
+   ขนาดตัวอักษร: ปรับฐาน body เป็น 17px (จากเดิม default ~16px) และขยาย
+   ทุกจุดที่เป็นเนื้อหาอ่าน/ป้ายกำกับ/ปุ่มขึ้นอีกขั้น เพื่อให้อาจารย์อ่าน
+   ได้สบายตาขึ้น โดยเฉพาะบนจอโปรเจคเตอร์/เครื่องอ่านหน้าห้องทะเบียน
+
    Signature: การ์ดทรง "บัตรผ่าน" (access pass) มีเส้นปรุแบบตั๋วคั่นระหว่าง
    ส่วนหัวกับฟอร์ม และจุดวงกลมกะพริบข้างปุ่มเข้าสู่ระบบสื่อถึงจังหวะ
    "แตะบัตร" ที่เครื่องอ่าน RFID
 
-   Layout (จอกว้าง): 2 คอลัมน์ — ฝั่งซ้ายเป็น brand panel อธิบาย flow
-   การแตะแท็ก 3 ขั้นตอน ฝั่งขวาเป็นการ์ดฟอร์มเดิม พับกลับเป็นคอลัมน์
-   เดียว (แสดงแค่การ์ดฟอร์ม) บนจอแคบ/มือถือ
+   Layout (จอกว้าง): 2 คอลัมน์ — ฝั่งซ้ายเป็น brand panel มีโลโก้วิทยาลัย
+   ด้านบน ตามด้วยคำอธิบาย flow การแตะแท็ก 3 ขั้นตอน + กล่องวิธีใช้งาน
+   ฝั่งขวาเป็นการ์ดฟอร์มเดิม พับกลับเป็นคอลัมน์เดียว (แสดงแค่การ์ดฟอร์ม
+   พร้อมโลโก้เวอร์ชัน mobile) บนจอแคบ/มือถือ
    ================================================================= */
 
    * { box-sizing: border-box; }
@@ -41,16 +49,16 @@
    }
    
    :root {
-     --ink: #1C2128;
-     --panel: #262B33;
-     --panel-2: #2E343D;
-     --teal: #3E9C8F;
-     --amber: #E8A33D;
-     --violet: #8B7FD1;
-     --ink-line: #3A4048;
-     --text-hi: #EDEDED;
-     --text-mid: #AEB4BC;
-     --text-low: #6E7580;
+     --ink: #1C1416;
+     --panel: #241A1C;
+     --panel-2: #2C2022;
+     --red: #D81F26;
+     --red-dark: #A4161C;
+     --white: #F5F1EC;
+     --ink-line: #3D2C2F;
+     --text-hi: #FAF7F3;
+     --text-mid: #C9BDB8;
+     --text-low: #8A7A76;
    }
    
    html, body {
@@ -59,6 +67,7 @@
      background: var(--ink);
      color: var(--text-hi);
      font-family: 'IBM Plex Sans Thai', sans-serif;
+     font-size: 17px;
    }
    
    .scene {
@@ -68,8 +77,8 @@
      justify-content: center;
      padding: 32px 16px;
      background:
-       radial-gradient(circle at 15% 10%, rgba(62,156,143,0.10), transparent 40%),
-       radial-gradient(circle at 85% 90%, rgba(232,163,61,0.08), transparent 45%),
+       radial-gradient(circle at 15% 10%, rgba(216,31,38,0.10), transparent 40%),
+       radial-gradient(circle at 85% 90%, rgba(245,241,236,0.08), transparent 45%),
        var(--ink);
    }
    
@@ -94,23 +103,31 @@
      justify-content: center;
      padding: 48px 44px;
      background:
-       radial-gradient(circle at 20% 20%, rgba(62,156,143,0.14), transparent 45%),
-       radial-gradient(circle at 90% 85%, rgba(139,127,209,0.10), transparent 50%),
+       radial-gradient(circle at 20% 20%, rgba(216,31,38,0.14), transparent 45%),
+       radial-gradient(circle at 90% 85%, rgba(216,31,38,0.10), transparent 50%),
        var(--panel);
      border-right: 1px solid var(--ink-line);
    }
    
+   /* --- โลโก้วิทยาลัย (desktop, บน brand-panel) --- */
+   .brand-logo {
+     width: 76px;
+     height: 76px;
+     margin-bottom: 20px;
+     display: block;
+   }
+
    .brand-eyebrow {
      font-family: 'IBM Plex Mono', monospace;
-     font-size: 11px;
+     font-size: 13px;
      letter-spacing: 0.16em;
-     color: var(--teal);
+     color: var(--red);
      margin-bottom: 16px;
    }
    
    .brand-title {
      font-family: 'IBM Plex Mono', monospace;
-     font-size: 30px;
+     font-size: 34px;
      font-weight: 700;
      line-height: 1.25;
      margin: 0 0 14px;
@@ -118,10 +135,10 @@
    }
    
    .brand-sub {
-     font-size: 14px;
+     font-size: 16px;
      color: var(--text-mid);
-     line-height: 1.6;
-     max-width: 36ch;
+     line-height: 1.65;
+     max-width: 38ch;
      margin: 0 0 36px;
    }
    
@@ -142,9 +159,9 @@
    
    .step-index {
      font-family: 'IBM Plex Mono', monospace;
-     font-size: 12px;
+     font-size: 13px;
      font-weight: 700;
-     color: var(--teal);
+     color: var(--red);
      border: 1px solid var(--ink-line);
      border-radius: 6px;
      padding: 3px 7px;
@@ -152,17 +169,52 @@
    }
    
    .step-title {
-     font-size: 14px;
+     font-size: 16px;
      font-weight: 600;
      color: var(--text-hi);
    }
    
    .step-desc {
-     font-size: 12.5px;
+     font-size: 14px;
      color: var(--text-mid);
      margin-top: 2px;
    }
    
+   /* --- กล่องสรุปวิธีใช้งาน (เพิ่มเติมจากขั้นตอน 3 ข้อด้านบน ให้เห็น
+      ชัดเจนในกล่องเดียวแบบอ่านเร็ว เหมาะกับอาจารย์ที่เพิ่งเคยใช้ครั้งแรก) --- */
+   .howto-box {
+     background: var(--panel-2);
+     border: 1px solid var(--ink-line);
+     border-left: 3px solid var(--red);
+     border-radius: 10px;
+     padding: 16px 18px;
+     margin: 0 0 32px;
+   }
+
+   .howto-box-title {
+     font-size: 14px;
+     font-weight: 700;
+     color: var(--text-hi);
+     margin: 0 0 8px;
+     display: flex;
+     align-items: center;
+     gap: 7px;
+   }
+
+   .howto-box-list {
+     margin: 0;
+     padding-left: 20px;
+     font-size: 14.5px;
+     color: var(--text-mid);
+     line-height: 1.7;
+   }
+
+   .howto-box-list li { margin-bottom: 2px; }
+   .howto-box-list li:last-child { margin-bottom: 0; }
+
+   /* เวอร์ชันย่อสำหรับจอแคบ/มือถือ อยู่ในการ์ดฟอร์ม */
+   .howto-box--mobile-only { display: none; }
+
    .brand-footer {
      margin-top: auto;
      padding-top: 20px;
@@ -178,22 +230,22 @@
      align-items: center;
      gap: 8px;
      align-self: flex-start;
-     background: var(--amber);
+     background: var(--white);
      color: #0F1418;
      font-family: 'IBM Plex Sans Thai', sans-serif;
-     font-size: 13.5px;
+     font-size: 15px;
      font-weight: 700;
      text-decoration: none;
-     padding: 11px 20px;
+     padding: 12px 22px;
      border-radius: 999px;
      margin-bottom: 28px;
-     box-shadow: 0 8px 22px rgba(232, 163, 61, 0.28);
+     box-shadow: 0 8px 22px rgba(245, 241, 236, 0.22);
      transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
    }
    
    .status-link:hover {
      filter: brightness(1.08);
-     box-shadow: 0 10px 26px rgba(232, 163, 61, 0.38);
+     box-shadow: 0 10px 26px rgba(245, 241, 236, 0.30);
    }
    
    .status-link:active {
@@ -217,18 +269,26 @@
      text-align: center;
      margin-bottom: 22px;
    }
+
+   /* --- โลโก้วิทยาลัย (mobile, บนการ์ดฟอร์ม) --- */
+   .pass-logo {
+     width: 64px;
+     height: 64px;
+     margin: 0 auto 14px;
+     display: block;
+   }
    
    .pass-eyebrow {
      font-family: 'IBM Plex Mono', monospace;
-     font-size: 11px;
+     font-size: 13px;
      letter-spacing: 0.16em;
-     color: var(--teal);
+     color: var(--red);
      margin-bottom: 10px;
    }
    
    .pass-title {
      font-family: 'IBM Plex Mono', monospace;
-     font-size: 24px;
+     font-size: 27px;
      font-weight: 700;
      margin: 0 0 8px;
      letter-spacing: -0.01em;
@@ -250,17 +310,17 @@
      background: transparent;
      color: var(--text-mid);
      font-family: 'IBM Plex Sans Thai', sans-serif;
-     font-size: 13.5px;
+     font-size: 15px;
      font-weight: 600;
-     padding: 10px 0;
+     padding: 12px 0;
      border-radius: 7px;
      cursor: pointer;
      transition: background 0.18s ease, color 0.18s ease;
    }
    
    .role-btn.is-active { color: #0F1418; }
-   .role-btn[data-role="teacher"].is-active { background: var(--violet); }
-   .role-btn[data-role="admin"].is-active { background: var(--amber); }
+   .role-btn[data-role="teacher"].is-active { background: var(--red); }
+   .role-btn[data-role="admin"].is-active { background: var(--white); }
    
    /* --- เส้นปรุแบบตั๋ว --- */
    .perforation {
@@ -301,27 +361,27 @@
      width: 14px;
      height: 14px;
      border-radius: 50%;
-     background: var(--violet);
+     background: var(--red);
      margin: 0 auto 18px;
      animation: pulse 1.6s infinite ease-in-out;
    }
    
    .waiting-title {
-     font-size: 15.5px;
+     font-size: 18px;
      font-weight: 700;
      color: var(--text-hi);
      margin: 0 0 6px;
    }
    
    .waiting-sub {
-     font-size: 13px;
+     font-size: 15px;
      color: var(--text-mid);
      margin: 0 0 22px;
      line-height: 1.6;
    }
    
    .waiting-sub #waiting-countdown {
-     color: var(--violet);
+     color: var(--red);
      font-family: 'IBM Plex Mono', monospace;
      font-weight: 700;
    }
@@ -351,7 +411,7 @@
      background: transparent;
      color: var(--text-low);
      font-family: 'IBM Plex Sans Thai', sans-serif;
-     font-size: 13px;
+     font-size: 15px;
      font-weight: 600;
      padding: 8px 4px 10px;
      margin-right: 18px;
@@ -371,7 +431,7 @@
    
    .mode-btn.is-active { color: var(--text-hi); }
    
-   [data-role-panel="teacher"] .mode-btn.is-active::after { background: var(--violet); }
+   [data-role-panel="teacher"] .mode-btn.is-active::after { background: var(--red); }
    
    /* --- ฟอร์ม --- */
    .mode-form { display: none; }
@@ -387,7 +447,7 @@
    
    label {
      display: block;
-     font-size: 12.5px;
+     font-size: 14.5px;
      color: var(--text-mid);
      margin-bottom: 6px;
      font-weight: 600;
@@ -398,8 +458,8 @@
      background: var(--panel-2);
      border: 1px solid var(--ink-line);
      border-radius: 9px;
-     padding: 11px 12px;
-     font-size: 14.5px;
+     padding: 13px 14px;
+     font-size: 17px;
      color: var(--text-hi);
      font-family: 'IBM Plex Mono', monospace;
      outline: none;
@@ -409,22 +469,22 @@
    input::placeholder { color: var(--text-low); }
    
    input:focus {
-     border-color: var(--teal);
-     box-shadow: 0 0 0 3px rgba(62,156,143,0.22);
+     border-color: var(--red);
+     box-shadow: 0 0 0 3px rgba(216,31,38,0.22);
    }
    
    [data-role-panel="teacher"] input:focus {
-     border-color: var(--violet);
-     box-shadow: 0 0 0 3px rgba(139,127,209,0.22);
+     border-color: var(--red);
+     box-shadow: 0 0 0 3px rgba(216,31,38,0.22);
    }
    
    #form-admin input:focus {
-     border-color: var(--amber);
-     box-shadow: 0 0 0 3px rgba(232,163,61,0.22);
+     border-color: var(--white);
+     box-shadow: 0 0 0 3px rgba(245,241,236,0.22);
    }
    
    .field-hint {
-     font-size: 11.5px;
+     font-size: 13.5px;
      color: var(--text-low);
      margin-top: 6px;
    }
@@ -434,12 +494,12 @@
      width: 100%;
      border: none;
      border-radius: 10px;
-     padding: 13px 0;
-     background: var(--teal);
+     padding: 15px 0;
+     background: var(--red);
      color: #0F1418;
      font-family: 'IBM Plex Sans Thai', sans-serif;
      font-weight: 700;
-     font-size: 15px;
+     font-size: 17px;
      cursor: pointer;
      display: flex;
      align-items: center;
@@ -452,8 +512,8 @@
    .submit-btn:hover { filter: brightness(1.08); }
    .submit-btn:active { transform: scale(0.98); }
    
-   .submit-btn--admin { background: var(--amber); }
-   .submit-btn--teacher { background: var(--violet); }
+   .submit-btn--admin { background: var(--white); }
+   .submit-btn--teacher { background: var(--red); }
    
    .scan-dot {
      width: 8px;
@@ -472,11 +532,11 @@
    .status-msg {
      min-height: 20px;
      text-align: center;
-     font-size: 13px;
+     font-size: 15px;
      margin-top: 16px;
      font-weight: 600;
    }
-   .status-msg.ok { color: var(--teal); }
+   .status-msg.ok { color: var(--red); }
    .status-msg.error { color: #E0645A; }
    
    /* --- footer --- */
@@ -489,10 +549,10 @@
    
    .stamp {
      font-family: 'IBM Plex Mono', monospace;
-     font-size: 10px;
+     font-size: 11px;
      letter-spacing: 0.08em;
-     color: var(--amber);
-     border: 1px solid var(--amber);
+     color: var(--white);
+     border: 1px solid var(--white);
      border-radius: 5px;
      padding: 3px 7px;
      transform: rotate(-3deg);
@@ -500,14 +560,14 @@
    }
    
    .footer-text {
-     font-size: 11px;
+     font-size: 13px;
      color: var(--text-low);
    }
    
    /* --- Accessibility: focus visible เสมอ --- */
    button:focus-visible,
    input:focus-visible {
-     outline: 2px solid var(--teal);
+     outline: 2px solid var(--red);
      outline-offset: 2px;
    }
    
@@ -529,6 +589,7 @@
      }
      .pass-header--mobile-only { display: block; }
      .pass-card { padding: 32px 28px 24px; }
+     .howto-box--mobile-only { display: block; }
    
      /* ปุ่ม "ดูสถานะกุญแจทั้งหมด" สำรอง เฉพาะจอแคบ (ตัวจริงใน .brand-panel
         ถูกซ่อนไปแล้วทั้งก้อนด้านบน) ใช้ display:flex + width:100% แทน
