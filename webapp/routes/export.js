@@ -185,6 +185,7 @@ function formatDateTimeTh(iso) {
   if (!iso) return "";
   try {
     return new Date(iso).toLocaleString("th-TH", {
+      timeZone: "Asia/Bangkok",
       dateStyle: "medium",
       timeStyle: "short",
     });
@@ -319,7 +320,8 @@ router.get("/keys/history/export", async (req, res) => {
 
   try {
     const rows = await fetchHistoryForExport({ roomTagId, teacherId, action, limit });
-    const dateStamp = new Date().toISOString().slice(0, 10);
+    // [TIMEZONE] en-CA ให้รูปแบบ YYYY-MM-DD ตามวันที่ของไทย (ไม่ใช่ UTC)
+    const dateStamp = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
 
     if (fmt === "docx") {
       const buffer = await buildDocx(rows);

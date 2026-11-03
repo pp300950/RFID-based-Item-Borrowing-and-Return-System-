@@ -47,6 +47,10 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
   connectTimeout: 20000,
+  // [TIMEZONE] ระบบนี้ใช้เวลาไทย (UTC+7) ทั้งหมด — บอก mysql2 ให้แปลง
+  // DATETIME <-> JS Date ด้วย +07:00 เสมอ ไม่ขึ้นกับ timezone ของเครื่องที่รัน
+  // Node (Render เป็น UTC, เครื่อง local เป็นเวลาไทย)
+  timezone: "+07:00",
   // เก็บ JSON column (borrow_window_days) ให้ mysql2 คืนเป็น string
   // ธรรมดา ไม่ auto-parse ให้ — โค้ด route ทำ JSON.parse/stringify เอง
   // ตามที่ตกลงกันไว้ใน schema.sql (กันพฤติกรรม auto-parse ของบาง
@@ -54,6 +58,13 @@ const pool = mysql.createPool({
   typeCast: function typeCast(field, next) {
     return next();
   },
+});
+
+// [TIMEZONE] ตั้ง time zone ของ session MySQL ทุก connection ให้เป็น +07:00
+// เพื่อให้ NOW() / DEFAULT CURRENT_TIMESTAMP ให้เวลาไทยเสมอ ไม่ว่า OS ของเครื่อง
+// ที่รัน MySQL จะตั้ง timezone ไว้เป็นอะไร
+pool.pool.on("connection", (conn) => {
+  conn.query("SET time_zone = '+07:00'");
 });
 
 /**

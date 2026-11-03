@@ -104,12 +104,14 @@ function clearSession(readerId) {
 // เพื่อให้ฟังก์ชันนี้ไม่ต้องรู้เรื่อง MySQL เลย
 // -------------------------------------------------------------
 function isWithinBorrowWindow(roomTag) {
-  const now = new Date();
+  // [TIMEZONE] เซิร์ฟเวอร์บน Render เป็น UTC — เลื่อนเวลาไป +7 ชม. แล้วอ่านด้วย
+  // getUTC* เพื่อให้ได้ "วัน/เวลาปัจจุบันของไทย" ไม่ขึ้นกับ timezone เครื่อง
+  const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
 
   // --- เช็ควัน ---
   const days = roomTag.borrow_window_days;
   if (Array.isArray(days) && days.length > 0) {
-    const currentDay = now.getDay(); // 0=อาทิตย์..6=เสาร์ ตรงกับ schema
+    const currentDay = now.getUTCDay(); // 0=อาทิตย์..6=เสาร์ ตรงกับ schema
     if (!days.includes(currentDay)) {
       return false;
     }
@@ -128,7 +130,7 @@ function isWithinBorrowWindow(roomTag) {
   // (ดู config/db.js) คืนค่า TIME column มาเป็น "HH:MM:SS" ตรงๆ อยู่แล้ว
   // เหมือนที่ postgres time type เคยถูก serialize มาผ่าน supabase-js
   const pad2 = (n) => String(n).padStart(2, "0");
-  const nowTimeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+  const nowTimeStr = `${pad2(now.getUTCHours())}:${pad2(now.getUTCMinutes())}:${pad2(now.getUTCSeconds())}`;
 
   if (start <= end) {
     // ช่วงปกติภายในวันเดียว
@@ -299,7 +301,7 @@ router.post("/tap", async (req, res) => {
         const createdTeacher = await withTransaction(async (conn) => {
           const [insertTeacherResult] = await conn.query(
             `INSERT INTO teachers (name, department, teacher_code, last_login_at)
-             VALUES (?, ?, ?, ?)`,
+             VALUES (?, ?, ?, NOW())`,
             [
               pending.name,
               pending.department,
@@ -308,7 +310,7 @@ router.post("/tap", async (req, res) => {
               // tag_uid ของบัตรที่แตะเป็น teacher_code ไปเลย — รับประกัน
               // ไม่ซ้ำอยู่แล้วเพราะ tag_uid มี unique constraint ในตัว
               cleanTagUid,
-              new Date(),
+              // [TIMEZONE] ใช้เวลาของ MySQL เอง (ตั้งเป็น +07:00 แล้วใน mysql-pool.js)
             ]
           );
 
@@ -386,9 +388,9 @@ router.post("/tap", async (req, res) => {
       // .select() ในตัวเหมือน Supabase)
       const [updateResult] = await query(
         `UPDATE room_tags
-         SET status = 'borrowed', borrowed_by_teacher_id = ?, borrowed_at = ?
+         SET status = 'borrowed', borrowed_by_teacher_id = ?, borrowed_at = NOW()
          WHERE id = ? AND status = 'available'`,
-        [session.teacherId, new Date(), roomTag.id]
+        [session.teacherId, roomTag.id]
       );
 
       if (updateResult.affectedRows === 0) {
@@ -414,6 +416,7 @@ router.post("/tap", async (req, res) => {
       // แล้วตั้งแต่ก่อนบรรทัดนี้ ไม่เกี่ยวกับผลของการแจ้งเตือน
       // -----------------------------------------------------------
       const nowStr = new Date().toLocaleTimeString("th-TH", {
+        timeZone: "Asia/Bangkok",
         hour: "2-digit",
         minute: "2-digit",
       });
