@@ -12,7 +12,7 @@
    .teacher-shell {
     min-height: 100vh;
     background:
-      radial-gradient(circle at 15% 0%, rgba(139, 127, 209, 0.09), transparent 40%),
+      radial-gradient(circle at 15% 0%, rgba(216, 31, 38, 0.09), transparent 40%),
       var(--ink);
   }
   
@@ -213,7 +213,7 @@
   .filter-row select:focus,
   .filter-row input:focus {
     border-color: var(--violet);
-    box-shadow: 0 0 0 3px rgba(139, 127, 209, 0.20);
+    box-shadow: 0 0 0 3px rgba(216, 31, 38, 0.20);
   }
   
   /* --- Item cards grid --- */
@@ -402,8 +402,8 @@
     font-size: 11.5px;
     font-weight: 600;
     color: var(--violet);
-    background: rgba(139, 127, 209, 0.12);
-    border: 1px solid rgba(139, 127, 209, 0.30);
+    background: rgba(216, 31, 38, 0.12);
+    border: 1px solid rgba(216, 31, 38, 0.30);
     border-radius: 8px;
     padding: 5px 9px;
     width: fit-content;
@@ -425,7 +425,7 @@
   
   .pill--available { background: rgba(62, 156, 143, 0.18); color: var(--teal); }
   .pill--borrowed { background: rgba(232, 163, 61, 0.18); color: var(--amber); }
-  .pill--mine { background: rgba(139, 127, 209, 0.18); color: var(--violet); }
+  .pill--mine { background: rgba(216, 31, 38, 0.18); color: var(--violet); }
   
   .item-card-action .btn { width: 100%; }
   
@@ -710,8 +710,8 @@
     font-size: 12.5px;
     font-weight: 600;
     color: var(--violet);
-    background: rgba(139, 127, 209, 0.10);
-    border: 1px solid rgba(139, 127, 209, 0.28);
+    background: rgba(216, 31, 38, 0.10);
+    border: 1px solid rgba(216, 31, 38, 0.28);
     border-radius: 10px;
     padding: 9px 12px;
     margin-bottom: 18px;
