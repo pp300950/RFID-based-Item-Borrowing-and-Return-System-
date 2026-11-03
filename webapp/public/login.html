@@ -19,20 +19,20 @@
         <img src="/img/logo.png" alt="โลโก้วิทยาลัยเทคโนโลยีชลบุรี" class="brand-logo" />
         <div class="brand-eyebrow">วิทยาลัยเทคโนโลยีชลบุรี · ระบบยืม-คืนกุญแจ</div>
         <h1 class="brand-title">ระบบยืม–คืนกุญแจ</h1>
-        <p class="brand-sub">อาจารย์แตะบัตรประจำตัวแล้วแตะแท็กกุญแจที่เครื่องอ่านหน้าห้องทะเบียนเพื่อยืม/คืน อาจารย์ที่ยังไม่มีบัตรสมัครได้ที่ฟอร์มด้านขวา</p>
+        <p class="brand-sub">อาจารย์พิมพ์รหัสประจำตัวของตัวเองที่เครื่องหน้าห้องทะเบียน แล้วแตะแท็กที่ติดกับกุญแจเพื่อยืม/คืน อาจารย์ที่ยังไม่เคยลงทะเบียนสมัครได้ที่ฟอร์มด้านขวา</p>
 
         <ol class="brand-steps">
           <li>
             <span class="step-index">01</span>
             <div>
-              <div class="step-title">อาจารย์แตะบัตรประจำตัว</div>
+              <div class="step-title">พิมพ์รหัสประจำตัว</div>
               <div class="step-desc">ระบบยืนยันตัวผู้ยืม/คืน</div>
             </div>
           </li>
           <li>
             <span class="step-index">02</span>
             <div>
-              <div class="step-title">แตะแท็กกุญแจ</div>
+              <div class="step-title">แตะแท็กที่ติดกับกุญแจ</div>
               <div class="step-desc">ยืมหรือคืนสำเร็จทันที</div>
             </div>
           </li>
@@ -48,18 +48,15 @@
         <div class="howto-box">
           <div class="howto-box-title">📌 วิธีใช้งานโดยสรุป</div>
           <ul class="howto-box-list">
-            <li>อาจารย์ที่มีบัตรอยู่แล้ว ไม่ต้องทำอะไรในหน้านี้ — ไปที่เครื่องอ่านแท็กหน้าห้องทะเบียนได้เลย</li>
-            <li>อาจารย์ที่ยังไม่มีบัตร ให้กรอกฟอร์ม "สมัครอาจารย์ใหม่" ด้านขวา แล้วไปแตะบัตรตามคำแนะนำ</li>
-            <li>ต้องการยืมหรือคืนกุญแจ: แตะบัตรประจำตัวก่อน แล้วแตะแท็กกุญแจดอกที่ต้องการ ระบบบันทึกให้ทันที ไม่ต้องรออนุมัติ</li>
+            <li>อาจารย์ที่ลงทะเบียนแล้ว ไม่ต้องทำอะไรในหน้านี้ — ไปที่เครื่องหน้าห้องทะเบียนได้เลย</li>
+            <li>อาจารย์ที่ยังไม่เคยลงทะเบียน ให้กรอกฟอร์ม "สมัครครูใหม่" ด้านขวา</li>
+            <li>ต้องการยืมหรือคืนกุญแจ: พิมพ์รหัสประจำตัวของตัวเองที่เครื่องก่อน แล้วแตะแท็กที่ติดกับกุญแจดอกที่ต้องการ ระบบบันทึกให้ทันที ไม่ต้องรออนุมัติ</li>
             <li>อยากรู้ว่ากุญแจดอกไหนว่าง/ถูกยืมอยู่ กดปุ่ม "ดูสถานะกุญแจทั้งหมด" ด้านล่าง</li>
           </ul>
         </div>
 
         <a href="#keys-status" class="status-link">ดูสถานะกุญแจทั้งหมด &rarr;</a>
 
-        <div class="brand-footer">
-          <span class="stamp">LIVE</span>
-        </div>
       </aside>
 
       <!-- ฝั่งขวา: การ์ดฟอร์ม -->
@@ -77,11 +74,10 @@
 
         <div class="perforation" aria-hidden="true"></div>
 
-        <!-- ================= ครู: สมัครด้วยการแตะบัตร ================= -->
+        <!-- ================= ครู: สมัครด้วยการกรอกรหัสประจำตัว ================= -->
         <section class="role-panel is-active" data-role-panel="teacher">
 
-          <!-- ขั้นที่ 1: กรอกฟอร์ม -->
-          <form id="form-teacher-register" class="pass-form register-step is-active" data-register-step="form" autocomplete="off">
+          <form id="form-teacher-register" class="pass-form is-active" autocomplete="off">
             <div class="field">
               <label for="tr-name">ชื่อ–นามสกุล</label>
               <input type="text" id="tr-name" name="name" placeholder="เช่น อ. สมหญิง ตั้งใจสอน" required />
@@ -92,22 +88,17 @@
               <input type="text" id="tr-department" name="department" placeholder="เช่น วิทยาศาสตร์" />
             </div>
 
+            <div class="field">
+              <label for="tr-code">รหัสประจำตัว</label>
+              <input type="text" id="tr-code" name="teacherCode" inputmode="numeric" pattern="[0-9]*" placeholder="ตัวเลขเท่านั้น" required />
+              <div class="field-hint">ใช้พิมพ์ที่เครื่องหน้าห้องทะเบียนตอนยืม/คืนกุญแจ</div>
+            </div>
+
             <button type="submit" class="submit-btn submit-btn--teacher">
               <span class="scan-dot" aria-hidden="true"></span>
-              เริ่มสมัคร
+              สมัคร
             </button>
-            <div class="field-hint" style="text-align:center; margin-top:10px;">
-              กรอกแล้วไปแตะบัตรประจำตัวที่เครื่องอ่านหน้าห้องทะเบียน
-            </div>
           </form>
-
-          <!-- ขั้นที่ 2: กำลังรอแตะบัตร (แสดง/ซ่อนด้วย JS) -->
-          <div id="register-waiting" class="register-step register-waiting" data-register-step="waiting">
-            <div class="waiting-dot" aria-hidden="true"></div>
-            <p class="waiting-title">กรุณาไปแตะบัตรประจำตัว</p>
-            <p class="waiting-sub">ที่เครื่องอ่านหน้าห้องทะเบียนภายใน <span id="waiting-countdown">60</span> วินาที</p>
-            <button type="button" id="btn-cancel-register" class="submit-btn submit-btn--cancel">ยกเลิก</button>
-          </div>
 
         </section>
 
@@ -140,10 +131,6 @@
              /teacher.html อีกต่อไป ดู README ข้อ 10.1) -->
         <a href="#keys-status" class="status-link status-link--mobile-only">ดูสถานะกุญแจทั้งหมด &rarr;</a>
 
-        <div class="pass-footer pass-footer--mobile-only">
-          <span class="stamp">LIVE</span>
-        </div>
-
       </div>
     </div>
   </div>
@@ -173,7 +160,7 @@
       <section>
         <h2 class="teacher-section-title">วิธีใช้งาน</h2>
         <p class="teacher-section-sub">
-          ครูแตะบัตรประจำตัวที่เครื่องอ่านหน้าห้องทะเบียนก่อน แล้วแตะแท็กกุญแจที่ต้องการยืมหรือคืน
+          ครูพิมพ์รหัสประจำตัวของตัวเองที่เครื่องหน้าห้องทะเบียนก่อน แล้วแตะแท็กที่ติดกับกุญแจที่ต้องการยืมหรือคืน
           ระบบจะบันทึกให้ทันที หน้านี้เป็นหน้าสาธารณะสำหรับดูสถานะปัจจุบันเท่านั้น ไม่ใช้ยืม-คืนผ่านเว็บ
           และไม่ต้องเข้าสู่ระบบ
         </p>
