@@ -1,54 +1,38 @@
 // routes/tap.js
 // -----------------------------------------------------------------
-// หัวใจของระบบใหม่: endpoint เดียวรับทุกการ "แตะแท็ก" จากเครื่องอ่านที่
-// ห้องทะเบียน (ดู rfid_reader flow: เครื่องอ่านพิมพ์เลขบัตรเข้า input
-// ที่โฟกัสค้างไว้บนหน้าเว็บ -> หน้าเว็บยิง POST มาที่นี่ทุกครั้งที่มี
-// ค่าใหม่เข้ามา)
+// *** เปลี่ยนใหญ่ (พ.ย. 2026): ตัดระบบ "บัตรครู" ออกทั้งหมด ***
+// ปีนี้โรงเรียนไม่มีบัตรประจำตัวครูแล้ว — ครูระบุตัวตนด้วยการ "พิมพ์
+// รหัสประจำตัว" (teachers.teacher_code) แทนการแตะแท็ก RFID
 //
-// ไม่ใส่ requireAuth เพราะจุดนี้ไม่ใช่ "ผู้ใช้ login" แต่เป็นอุปกรณ์ทาง
-// กายภาพที่ตั้งอยู่หน้างาน (ห้องทะเบียน) — ความปลอดภัยอยู่ที่ตัวแท็ก
-// ประจำตัวครูเอง (ต้องมีบัตรจริงถึงจะแตะได้) ไม่ใช่ JWT
+// endpoint นี้ (POST /api/tap) ตอนนี้รับเฉพาะ "แท็กกุญแจห้อง" เท่านั้น
+// (room_tags) — ไม่เช็ค teacher_tags อีกต่อไป เพราะตารางนั้นถูกลบไปแล้ว
+// (ดู schema.sql) การเปิด session ครูย้ายไปที่ endpoint ใหม่:
+//   POST /api/tap/teacher-code  (ดูด้านล่าง)
 //
-// Flow:
-//   1. แตะแท็กครู (tag_uid ตรงกับ teacher_tags) -> เปิด/ต่ออายุ session
-//      ชั่วคราวผูกกับ "เครื่องอ่านเครื่องนี้" (readerId) เก็บใน memory
-//      พอ เพราะอายุสั้น ไม่ต้องมี table
+// Flow ใหม่:
+//   1. ครูพิมพ์รหัสประจำตัว (ตัวเลขล้วน) ผ่านคีย์แพดบน display.html ->
+//      POST /api/tap/teacher-code -> เปิด/ต่ออายุ session ผูกกับ
+//      "เครื่องอ่านเครื่องนี้" (readerId) เก็บใน memory เหมือนเดิม
 //   2. แตะแท็กกุญแจ (tag_uid ตรงกับ room_tags) ต่อได้เรื่อยๆ ภายใน
-//      session เดียวกัน (ยืมได้หลายดอกต่อครั้ง):
+//      session เดียวกัน (ยืมได้หลายดอกต่อครั้ง) ผ่าน POST /api/tap:
 //        - room_tags.status === 'available' -> ยืม (borrow)
 //        - room_tags.status === 'borrowed' โดยครูคนเดียวกับ session -> คืน (return)
 //        - room_tags.status === 'borrowed' โดยครูอื่น -> แจ้ง error ไม่ทำอะไร
 //   3. session หมดอายุอัตโนมัติถ้าไม่มีการแตะกุญแจต่อภายใน TTL ที่ตั้งไว้
-//      (แตะแท็กครูใหม่เพื่อเริ่ม session ใหม่ได้เสมอ)
+//      (พิมพ์รหัสใหม่เพื่อเริ่ม session ใหม่ได้เสมอ)
 //
-// [MySQL migration] จุดที่เปลี่ยนหลักๆ ในไฟล์นี้ (ดู MANIFEST ข้อ 1-3, 9):
-//   - teacher_tags -> teachers embed (Supabase nested select) เขียนเป็น
-//     LEFT JOIN ธรรมดา แล้ว map กลับเป็น shape { teacher_id, teachers: {id, name} }
-//   - room_tags -> borrowed_by:borrowed_by_teacher_id(...) embed เขียนเป็น
-//     LEFT JOIN กับ teachers อีกตัว แล้ว map กลับเป็น
-//     { ...room, borrowed_by: {id, name} | null } เหมือนเดิมทุกจุด
-//   - borrow_window_days เป็น JSON column แล้ว (ไม่ใช่ Postgres smallint[])
-//     ต้อง JSON.parse ก่อนส่งเข้า isWithinBorrowWindow() เพราะ mysql2 คืน
-//     JSON column มาเป็น string ดิบ ไม่ auto-parse ให้เหมือน supabase-js
-//   - .eq(...).eq(...).select().maybeSingle() (conditional update กัน
-//     race) เขียนเป็น UPDATE ... WHERE ... แล้วเช็ค result.affectedRows
-//     === 0 แทนการเช็ค null, แล้ว SELECT แถวใหม่อีกทีหลัง update สำเร็จ
-//     (mysql2 ไม่มี .select() ในตัวเหมือน Supabase)
-//   - แตะแท็กครูใหม่ (auto-register): insert teachers + insert
-//     teacher_tags สองคำสั่งแยกกัน ห่อด้วย withTransaction() จริงตาม
-//     ข้อ 9 ของ MANIFEST (ของเดิมบน Supabase ไม่มี transaction จริงตรงนี้)
+// ไม่ใส่ requireAuth ทั้งสอง endpoint เพราะจุดนี้ไม่ใช่ "ผู้ใช้ login"
+// แต่เป็นอุปกรณ์ทางกายภาพที่ตั้งอยู่หน้างาน (ห้องทะเบียน เครื่องเดียว
+// เปิดให้ครูทุกคนใช้งานร่วมกัน) — ความปลอดภัยอยู่ที่ตัวรหัสครู (ต้องรู้
+// รหัสจริงถึงจะพิมพ์ถูก) ไม่ใช่ JWT
 // -----------------------------------------------------------------
 
 const express = require("express");
 const router = express.Router();
-const { query, withTransaction } = require("../config/db");
-const {
-  getPendingRegistration,
-  resolveRegistration,
-} = require("./register_session");
+const { query } = require("../config/db");
 const { sendGroupMessage, buildBorrowedMessage } = require("../services/line_notify");
 
-const SESSION_TTL_MS = 20 * 1000; // 20 วินาที นับจากการแตะล่าสุด (ครูหรือกุญแจ)
+const SESSION_TTL_MS = 20 * 1000; // 20 วินาที นับจากการแตะล่าสุด (เปิด session หรือแตะกุญแจ)
 
 // key: readerId (string) -> { teacherId, teacherName, expiresAt }
 const activeSessions = new Map();
@@ -87,21 +71,15 @@ function clearSession(readerId) {
 // เช็คว่า "ตอนนี้" (เวลาปัจจุบันของ server) อยู่ในช่วงที่อนุญาตให้ยืม
 // กุญแจดอกนี้ไหม ตาม roomTag.borrow_window_days / _start / _end
 //
-// กติกา (ตรงกับ schema.sql + Task 2a):
+// กติกา (ตรงกับ schema.sql):
 //   - borrow_window_days: null/ว่าง = ไม่จำกัดวัน (ทุกวันผ่านเงื่อนไขนี้)
 //     ไม่ null = ต้องมีเลขวันปัจจุบัน (0=อาทิตย์..6=เสาร์) อยู่ในอาร์เรย์
-//   - borrow_window_start/_end: ต้องมาคู่กันเสมอ (การันตีจาก Task 2a
-//     validateBorrowWindow) — null ทั้งคู่ = ไม่จำกัดเวลา
+//   - borrow_window_start/_end: ต้องมาคู่กันเสมอ — null ทั้งคู่ = ไม่จำกัดเวลา
 //   - รองรับช่วงข้ามเที่ยงคืน (เช่น 22:00–06:00): ถ้า start > end แปลว่า
 //     ช่วงเวลาที่อนุญาต "ข้ามคืน" ไปวันถัดไป เช็คแบบ (now >= start ||
 //     now <= end) แทนแบบปกติ (now >= start && now <= end)
 //   - เฉพาะการ "ยืม" เท่านั้นที่ถูกเช็คนี้กัน — การ "คืน" ไม่ต้องเรียก
 //     ฟังก์ชันนี้เลย (ดูจุดเรียกใช้ด้านล่าง)
-//
-// [MySQL] ฟังก์ชันนี้ไม่แก้ logic เลย ยังรับ roomTag.borrow_window_days
-// เป็น JS array/null เหมือนเดิม — การแปลงจาก JSON string ของ MySQL เป็น
-// array ทำที่จุดโหลด roomTag ก่อนเรียกฟังก์ชันนี้ (ดู parseRoomTagRow)
-// เพื่อให้ฟังก์ชันนี้ไม่ต้องรู้เรื่อง MySQL เลย
 // -------------------------------------------------------------
 function isWithinBorrowWindow(roomTag) {
   // [TIMEZONE] เซิร์ฟเวอร์บน Render เป็น UTC — เลื่อนเวลาไป +7 ชม. แล้วอ่านด้วย
@@ -128,7 +106,6 @@ function isWithinBorrowWindow(roomTag) {
 
   // เทียบแบบ string "HH:MM:SS" ตรงๆ ได้เลย — mysql2 กับ dateStrings:true
   // (ดู config/db.js) คืนค่า TIME column มาเป็น "HH:MM:SS" ตรงๆ อยู่แล้ว
-  // เหมือนที่ postgres time type เคยถูก serialize มาผ่าน supabase-js
   const pad2 = (n) => String(n).padStart(2, "0");
   const nowTimeStr = `${pad2(now.getUTCHours())}:${pad2(now.getUTCMinutes())}:${pad2(now.getUTCSeconds())}`;
 
@@ -149,9 +126,6 @@ function isWithinBorrowWindow(roomTag) {
 //     borrowed_by: { id, name } | null,
 //     borrow_window_days: array | null,   // parse จาก JSON string
 //     borrow_window_start, borrow_window_end }
-//
-// [MySQL] แทนที่ Supabase nested select
-// "borrowed_by:borrowed_by_teacher_id(id, name)" — ดู MANIFEST ข้อ 3
 // -------------------------------------------------------------
 function parseRoomTagRow(row) {
   return {
@@ -184,17 +158,71 @@ const ROOM_TAG_SELECT_SQL = `
 `;
 
 // -------------------------------------------------------------
+// POST /api/tap/teacher-code
+// body: { teacherCode, readerId }
+// ครูพิมพ์รหัสประจำตัว (ตัวเลขล้วน) ผ่านคีย์แพดบนจอ -> เปิด/ต่ออายุ
+// session ยืม-คืน (แทนที่การ "แตะแท็กครู" แบบเดิม)
+//
+// เป็น synchronous call เดียวจบ — รู้ผลทันทีไม่ต้อง poll (ต่างจาก flow
+// สมัครครูแบบเดิมที่ต้องรอแตะบัตรแยกต่างหาก)
+// -------------------------------------------------------------
+router.post("/tap/teacher-code", async (req, res) => {
+  const { teacherCode, readerId } = req.body;
+  const reader = readerId || "default";
+
+  if (!teacherCode || !teacherCode.toString().trim()) {
+    return res.status(400).json({ ok: false, message: "กรุณากรอกรหัสประจำตัวครู" });
+  }
+
+  const cleanCode = teacherCode.toString().trim();
+
+  if (!/^[0-9]+$/.test(cleanCode)) {
+    return res.status(400).json({ ok: false, message: "รหัสประจำตัวครูต้องเป็นตัวเลขเท่านั้น" });
+  }
+
+  try {
+    const [teacherRows] = await query(
+      `SELECT id, name FROM teachers WHERE teacher_code = ? LIMIT 1`,
+      [cleanCode]
+    );
+
+    if (teacherRows.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        state: "unknown_code",
+        message: "ไม่พบรหัสประจำตัวนี้ในระบบ กรุณาตรวจสอบรหัสอีกครั้ง หรือติดต่อแอดมิน",
+      });
+    }
+
+    const teacher = teacherRows[0];
+
+    // เปิด session ยืม-คืน (ทับ session เดิมถ้ามี)
+    setSession(reader, teacher.id, teacher.name);
+
+    return res.json({
+      ok: true,
+      state: "session_started",
+      message: `สวัสดีคุณครู ${teacher.name} — แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย`,
+      teacher: { id: teacher.id, name: teacher.name },
+    });
+  } catch (err) {
+    console.error("Teacher-code tap error:", err.message);
+    return res.status(500).json({ ok: false, message: "ตรวจสอบรหัสประจำตัวไม่สำเร็จ" });
+  }
+});
+
+// -------------------------------------------------------------
 // POST /api/tap
 // body: { tagUid, readerId }
+// รับเฉพาะ "แท็กกุญแจห้อง" เท่านั้น — ต้องมี session ครูที่เปิดไว้แล้ว
+// ผ่าน POST /api/tap/teacher-code ก่อนเสมอ (ไม่มีแท็กครูอีกต่อไป)
+//
 // readerId: ตัวระบุเครื่องอ่าน (เผื่ออนาคตมีหลายเครื่อง) ถ้าไม่ส่งมา
 // ใช้ "default" — พอสำหรับกรณีมีเครื่องอ่านเดียวที่ห้องทะเบียนตอนนี้
 //
 // response ทุกกรณีมี field "state" บอกสถานะปัจจุบันให้หน้าจอแสดงผล:
-//   'session_started' | 'borrowed' | 'returned' | 'wrong_teacher' |
-//   'unknown_tag' | 'session_expired' | 'outside_window'
-//   ('outside_window' เพิ่มใหม่ — Task 6: ยืมถูกบล็อกเพราะอยู่นอกช่วง
-//   เวลาที่อนุญาต ดู isWithinBorrowWindow ด้านล่าง — ใช้กับ "ยืม" เท่านั้น
-//   "คืน" ไม่มี state นี้เกิดขึ้นได้เลยเพราะไม่ถูกเช็คช่วงเวลา)
+//   'borrowed' | 'returned' | 'wrong_teacher' | 'unknown_tag' |
+//   'session_expired' | 'outside_window'
 // -------------------------------------------------------------
 router.post("/tap", async (req, res) => {
   const { tagUid, readerId } = req.body;
@@ -207,62 +235,7 @@ router.post("/tap", async (req, res) => {
   const cleanTagUid = tagUid.trim();
 
   try {
-    // -----------------------------------------------------------
-    // เช็คก่อนว่าแท็กนี้เป็นแท็กครูหรือแท็กกุญแจ (สอง table แยกกัน
-    // เพราะเลขแท็กแต่ละประเภทไม่ชนกันอยู่แล้วโดย unique constraint
-    // ของแต่ละ table เอง)
-    //
-    // [MySQL] teacher_tags(...).select("teacher_id, teachers(id, name)")
-    // -> LEFT JOIN teachers ธรรมดา (ดู MANIFEST ข้อ 3)
-    // -----------------------------------------------------------
-    const [teacherTagRows] = await query(
-      `SELECT tt.teacher_id, t.id AS teacher_id_full, t.name AS teacher_name
-       FROM teacher_tags tt
-       JOIN teachers t ON t.id = tt.teacher_id
-       WHERE tt.tag_uid = ?
-       LIMIT 1`,
-      [cleanTagUid]
-    );
-
-    const teacherTag = teacherTagRows.length > 0 ? teacherTagRows[0] : null;
-
-    // --- กรณี 1: แตะแท็กครู ---
-    if (teacherTag) {
-      const teacher = { id: teacherTag.teacher_id_full, name: teacherTag.teacher_name };
-
-      // ถ้า readerId นี้กำลังอยู่ในโหมดรอสมัครครูคนใหม่พอดี แปลว่าคนที่
-      // กำลังสมัครแตะบัตรใบที่ "มีคนใช้อยู่แล้ว" เข้ามา (บัตรประจำตัว
-      // ครูที่โรงเรียนออกให้ ไม่ใช่แท็กแบนพวงกุญแจแบบเดิม ผูกได้แค่ครู
-      // เดียวเสมอ) ต้องแจ้ง error ให้ชัดว่าบัตรนี้ผูกกับครูคนอื่นไปแล้ว
-      // ไม่ใช่ไปเปิด session ยืม-คืนแทนให้เงียบๆ
-      const pendingDuringTeacherTap = getPendingRegistration(reader);
-      if (pendingDuringTeacherTap) {
-        resolveRegistration(reader, {
-          ok: false,
-          message: `บัตรใบนี้ถูกใช้เป็นบัตรประจำตัวของคุณครู ${teacher.name} อยู่แล้ว กรุณาใช้บัตรใบอื่น หรือติดต่อแอดมินหากบัตรนี้ควรเป็นของคุณ`,
-        });
-        return res.status(409).json({
-          ok: false,
-          state: "tag_already_bound",
-          message: `บัตรใบนี้ถูกใช้เป็นบัตรประจำตัวของคุณครู ${teacher.name} อยู่แล้ว`,
-        });
-      }
-
-      // ไม่ได้อยู่ในโหมดสมัคร -> เป็นการแตะปกติ เปิด session ยืม-คืน (ทับ session เดิมถ้ามี)
-      setSession(reader, teacher.id, teacher.name);
-
-      return res.json({
-        ok: true,
-        state: "session_started",
-        message: `สวัสดีคุณครู ${teacher.name} — แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย`,
-        teacher: { id: teacher.id, name: teacher.name },
-      });
-    }
-
-    // --- ไม่ใช่แท็กครู -> เช็คว่าเป็นแท็กกุญแจไหม ---
-    // [MySQL] room_tags(...).select("..., borrowed_by:borrowed_by_teacher_id(id, name), ...")
-    // -> ROOM_TAG_SELECT_SQL (LEFT JOIN teachers) แล้ว parseRoomTagRow()
-    // แปลงกลับเป็น shape เดิม (ดู MANIFEST ข้อ 3)
+    // --- เช็คว่าเป็นแท็กกุญแจที่รู้จักไหม ---
     const [roomTagRows] = await query(
       `${ROOM_TAG_SELECT_SQL} WHERE rt.tag_uid = ? LIMIT 1`,
       [cleanTagUid]
@@ -271,97 +244,21 @@ router.post("/tap", async (req, res) => {
     const roomTag = roomTagRows.length > 0 ? parseRoomTagRow(roomTagRows[0]) : null;
 
     if (!roomTag) {
-      // -------------------------------------------------------
-      // ไม่เจอทั้ง teacher_tags และ room_tags — ก่อนจะตอบว่า "ไม่รู้จัก
-      // แท็กนี้" ต้องเช็คก่อนว่า readerId นี้กำลังอยู่ใน "โหมดรอสมัคร"
-      // ครูอยู่หรือเปล่า (มีคนกรอกฟอร์มสมัครค้างไว้ผ่าน
-      // POST /api/register/teacher/start แล้วรอแตะบัตรอยู่พอดี)
-      //
-      // ถ้าใช่ -> intent ตอนนั้นชัดเจนว่าแตะเพื่อผูกเป็นบัตรครูใหม่
-      // จึงสร้างครูใหม่ + ผูก tag_uid ให้ทันที ไม่ต้อง auto-create
-      // ในกรณีอื่นนอกเหนือจากนี้เด็ดขาด (ความปลอดภัย: ป้องกันแท็กแปลก
-      // ปลอมสร้างครูใหม่มั่วๆ ตอนไม่มีใครกำลังสมัครอยู่)
-      // -------------------------------------------------------
-      const pending = getPendingRegistration(reader);
-
-      if (!pending) {
-        return res.status(404).json({
-          ok: false,
-          state: "unknown_tag",
-          message: "ไม่พบแท็กนี้ในระบบ (ไม่ใช่ทั้งแท็กครูและแท็กกุญแจ)",
-        });
-      }
-
-      try {
-        // [MySQL] insert teachers + insert teacher_tags สองคำสั่งแยกกัน
-        // -> ห่อด้วย withTransaction() จริงตามข้อ 9 ของ MANIFEST (ของเดิม
-        // บน Supabase ไม่มี transaction จริงตรงนี้ — ถ้า insert ที่สอง
-        // ล้มเหลว ครูที่สร้างไปแล้วจะค้างไม่มี tag ผูก) ที่นี่ถ้า insert
-        // ใดล้มเหลว rollback ทั้งคู่กลับ ไม่ทิ้งครูกำพร้าไว้
-        const createdTeacher = await withTransaction(async (conn) => {
-          const [insertTeacherResult] = await conn.query(
-            `INSERT INTO teachers (name, department, teacher_code, last_login_at)
-             VALUES (?, ?, ?, NOW())`,
-            [
-              pending.name,
-              pending.department,
-              // teachers.teacher_code เป็น NOT NULL ใน schema จริง แต่ flow
-              // สมัครผ่านการแตะบัตรนี้ไม่มีขั้นตอนให้ครูกรอกรหัสเอง จึงใช้
-              // tag_uid ของบัตรที่แตะเป็น teacher_code ไปเลย — รับประกัน
-              // ไม่ซ้ำอยู่แล้วเพราะ tag_uid มี unique constraint ในตัว
-              cleanTagUid,
-              // [TIMEZONE] ใช้เวลาของ MySQL เอง (ตั้งเป็น +07:00 แล้วใน mysql-pool.js)
-            ]
-          );
-
-          const teacherId = insertTeacherResult.insertId;
-
-          await conn.query(
-            `INSERT INTO teacher_tags (teacher_id, tag_uid) VALUES (?, ?)`,
-            [teacherId, cleanTagUid]
-          );
-
-          const [teacherRows] = await conn.query(
-            `SELECT id, name FROM teachers WHERE id = ?`,
-            [teacherId]
-          );
-
-          return teacherRows[0];
-        });
-
-        resolveRegistration(reader, {
-          ok: true,
-          teacher: { id: createdTeacher.id, name: createdTeacher.name },
-        });
-
-        return res.json({
-          ok: true,
-          state: "registered",
-          message: `สมัครสำเร็จ — คุณครู ${createdTeacher.name} ผูกบัตรประจำตัวเรียบร้อยแล้ว`,
-          teacher: { id: createdTeacher.id, name: createdTeacher.name },
-        });
-      } catch (registerErr) {
-        console.error("Tap register-bind error:", registerErr.message);
-        resolveRegistration(reader, {
-          ok: false,
-          message: "ผูกบัตรกับบัญชีที่กำลังสมัครไม่สำเร็จ กรุณาลองสมัครใหม่อีกครั้ง",
-        });
-        return res.status(500).json({
-          ok: false,
-          state: "register_failed",
-          message: "ผูกบัตรกับบัญชีที่กำลังสมัครไม่สำเร็จ กรุณาลองสมัครใหม่อีกครั้ง",
-        });
-      }
+      return res.status(404).json({
+        ok: false,
+        state: "unknown_tag",
+        message: "ไม่พบแท็กกุญแจนี้ในระบบ",
+      });
     }
 
-    // --- กรณี 2: แตะแท็กกุญแจ -> ต้องมี session ครูที่ยัง active อยู่ก่อน ---
+    // --- ต้องมี session ครูที่ยัง active อยู่ก่อน (เปิดผ่านรหัสประจำตัว) ---
     const session = getSession(reader);
 
     if (!session) {
       return res.status(409).json({
         ok: false,
         state: "session_expired",
-        message: "กรุณาแตะแท็กประจำตัวครูก่อน แล้วค่อยแตะแท็กกุญแจ",
+        message: "กรุณาพิมพ์รหัสประจำตัวครูก่อน แล้วค่อยแตะแท็กกุญแจ",
       });
     }
 
@@ -370,7 +267,6 @@ router.post("/tap", async (req, res) => {
     // --- ตัดสินใจ borrow หรือ return ---
     if (roomTag.status === "available") {
       // ยืม — เช็คช่วงเวลาที่อนุญาตก่อนเสมอ (การคืนไม่ต้องเช็คนี้เลย —
-      // ดู isWithinBorrowWindow ด้านบนและ constraint ที่ล็อกไว้ใน MANIFEST:
       // "คืน" ต้องทำได้เสมอไม่ว่ากรณีใด กันครูค้างกุญแจเพราะติดช่วงห้ามยืม)
       if (!isWithinBorrowWindow(roomTag)) {
         return res.status(409).json({
@@ -381,11 +277,8 @@ router.post("/tap", async (req, res) => {
         });
       }
 
-      // [MySQL] .update({...}).eq("id", roomTag.id).eq("status", "available")
-      // .select().maybeSingle() -> UPDATE ... WHERE ... แล้วเช็ค
-      // affectedRows === 0 แทนการเช็ค null (ดู MANIFEST ข้อ 2) — ถ้า
-      // affectedRows > 0 ถึงจะ SELECT แถวใหม่กลับมา (mysql2 ไม่มี
-      // .select() ในตัวเหมือน Supabase)
+      // UPDATE ... WHERE ... แล้วเช็ค affectedRows === 0 (conditional
+      // update กัน race) — ถ้า affectedRows > 0 ถึงจะถือว่ายืมสำเร็จ
       const [updateResult] = await query(
         `UPDATE room_tags
          SET status = 'borrowed', borrowed_by_teacher_id = ?, borrowed_at = NOW()
@@ -442,9 +335,8 @@ router.post("/tap", async (req, res) => {
     // status === 'borrowed' ตอนนี้
     if (roomTag.borrowed_by_teacher_id === session.teacherId) {
       // คืน (ครูคนเดิมที่ยืมไปแตะซ้ำ)
-      // [MySQL] conditional update กัน race เหมือนจุดยืมด้านบน แต่เช็ค
-      // เงื่อนไขเพิ่มอีกชั้น (status = 'borrowed' AND borrowed_by_teacher_id = ?)
-      // ตรงกับ .eq().eq().eq() สามชั้นของเดิม
+      // conditional update กัน race เหมือนจุดยืมด้านบน แต่เช็คเงื่อนไข
+      // เพิ่มอีกชั้น (status = 'borrowed' AND borrowed_by_teacher_id = ?)
       const [updateResult] = await query(
         `UPDATE room_tags
          SET status = 'available', borrowed_by_teacher_id = NULL, borrowed_at = NULL

@@ -4,82 +4,96 @@
 // ระบบนี้ไม่มีนักเรียนเข้าใช้งานเว็บแล้ว มีแค่ครูที่ยืม-คืนกุญแจผ่าน
 // การแตะแท็กจริงที่เครื่องอ่าน ไม่ใช่ผ่านฟอร์มเว็บ)
 //
-// *** เปลี่ยนใหญ่: ตัด teacher login/register แบบกรอกรหัสครูเองออก
-// ทั้งหมด *** ครูไม่ login ผ่านเว็บอีกต่อไป — การสมัครเปลี่ยนเป็น
-// "กรอกชื่อ-แผนก แล้วไปแตะบัตรประจำตัวที่เครื่องอ่านที่ห้องทะเบียน"
-// โดย tag_uid จะถูกผูกให้อัตโนมัติทันทีที่แตะ (ดู routes/tap.js +
-// routes/register_session.js ประกอบ) ไม่มีขั้นตอน "แอดมินผูกแท็ก
-// ทีหลัง" อีกต่อไปสำหรับ flow ปกติ
+// [พ.ย. 2026] ตัด flow สมัครครูแบบ "กรอกชื่อ-แผนก แล้วไปแตะบัตรที่
+// เครื่องอ่าน" (poll รอจนกว่าจะมีคนแตะบัตร) ออกทั้งหมด — โรงเรียนเลิก
+// ใช้บัตร RFID ประจำตัวครูแล้ว ไม่มี routes/register_session.js อีก
+// ต่อไป (ลบไฟล์ทิ้งทั้งไฟล์) สมัครครูเปลี่ยนเป็น endpoint เดียวจบ:
+// กรอกชื่อ-แผนก-รหัสประจำตัว (teacherCode) แล้วเสร็จทันที ไม่ต้อง poll
+// รอแตะบัตรอีกต่อไป — การเปิด session ยืม-คืนกุญแจย้ายไปที่
+// routes/tap.js (POST /api/tap/teacher-code) ซึ่งครูพิมพ์รหัสประจำตัว
+// เดียวกันนี้ที่หน้าจอห้องทะเบียนตอนจะยืม/คืนจริง — กุญแจห้อง
+// (room_tags) ยังใช้แตะแท็ก RFID เหมือนเดิมทุกอย่าง ไม่กระทบ
 // -----------------------------------------------------------------
 const express = require("express");
 const router = express.Router();
-// [MySQL migration] เดิม require("../config/supabaseClient") ไว้ตรงนี้
-// แต่ไม่มีจุดไหนในไฟล์นี้เรียกใช้ supabase client เลยสักครั้ง — flow
-// สร้างครูทั้งหมดย้ายไปทำใน tap.js (insert teachers/teacher_tags ผ่าน
-// register_session.js แบบ in-memory) ส่วน login แอดมินก็เทียบกับ env
-// var ตรงๆ ไม่แตะ DB จึงตัด import ทิ้งไปเลย ไม่ต้องแทนด้วย
-// require("../config/db") เพราะไม่มี query ให้เรียกในไฟล์นี้จริงๆ
-const { signToken, requireAuth } = require("./middleware_auth");
-const {
-  startRegistration,
-  pollRegistration,
-  clearRegistration,
-} = require("./register_session");
+const { query } = require("../config/db");
+const { signToken, requireAuth } = require("../middleware/auth");
 
 // =================================================================
-// ครู — สมัครด้วยการแตะบัตร (ไม่มี login ผ่านเว็บอีกต่อไป)
+// ครู — สมัครด้วยการกรอกรหัสประจำตัว (ไม่มี login ผ่านเว็บ)
 // =================================================================
 
 // -------------------------------------------------------------
-// POST /api/register/teacher/start
-// body: { name, department, readerId? }
-// เปิด "pending registration session" รอให้มีคนไปแตะบัตรที่เครื่องอ่าน
-// ที่ห้องทะเบียน (readerId เดียวกับที่ tap.js ใช้ — ไม่ส่งมาก็ default
-// เป็น "default" เพราะตอนนี้มีเครื่องอ่านเครื่องเดียว)
+// POST /api/register/teacher
+// body: { name, department, teacherCode }
+// สมัครครูใหม่ — endpoint เดียวจบ รู้ผลทันที ไม่ต้อง poll รอแตะบัตร
+// เหมือน flow เดิม (ดู comment หัวไฟล์)
 //
-// หน้าเว็บต้องเรียก POST นี้ก่อน แล้วค่อยเริ่ม poll
-// GET /api/register/teacher/session ต่อเนื่องจนกว่าจะสำเร็จ/timeout
+// กติกา:
+//   - name: บังคับกรอก ห้ามเป็นค่าว่าง/เว้นวรรคล้วน
+//   - department: ไม่บังคับ
+//   - teacherCode: บังคับกรอก ต้องเป็นตัวเลขล้วนเท่านั้น (คีย์แพดตัวเลข
+//     หน้า display.html) และห้ามซ้ำกับครูที่มีอยู่แล้ว (unique key
+//     uq_teachers_teacher_code ใน schema.sql เป็น safety net อีกชั้น
+//     เผื่อ race condition ระหว่าง pre-check กับ insert จริง)
 // -------------------------------------------------------------
-router.post("/register/teacher/start", (req, res) => {
-  const { name, department, readerId } = req.body;
+router.post("/register/teacher", async (req, res) => {
+  const { name, department, teacherCode } = req.body;
 
   if (!name || !name.trim()) {
     return res.status(400).json({ ok: false, message: "กรุณากรอกชื่อ-นามสกุล" });
   }
 
-  const reader = startRegistration(readerId, name.trim(), department ? department.trim() : null);
+  if (!teacherCode || !teacherCode.toString().trim()) {
+    return res.status(400).json({ ok: false, message: "กรุณากรอกรหัสประจำตัวครู" });
+  }
 
-  return res.json({
-    ok: true,
-    readerId: reader,
-    message: "กรุณาไปแตะบัตรประจำตัวครูที่เครื่องอ่านที่ห้องทะเบียนภายใน 60 วินาที",
-  });
-});
+  const cleanTeacherCode = teacherCode.toString().trim();
 
-// -------------------------------------------------------------
-// GET /api/register/teacher/session?readerId=xxx
-// ให้หน้าเว็บ poll เช็คว่ามีคนแตะบัตรเข้ามาจับคู่กับ session สมัครนี้
-// หรือยัง — response 3 แบบ:
-//   { active: true, ... }                     ยังรออยู่ ยังไม่หมดเวลา
-//   { active: false, result: { ok: true, ... } }   แตะสำเร็จ ผูกแท็กแล้ว
-//   { active: false, result: { ok: false, ... } }  แตะแล้วแต่ error (เช่นบัตรซ้ำ)
-//   { active: false }                          หมดเวลา / ไม่มี session
-// -------------------------------------------------------------
-router.get("/register/teacher/session", (req, res) => {
-  const reader = (req.query.readerId || "default").toString();
-  const status = pollRegistration(reader);
-  return res.json({ ok: true, ...status });
-});
+  if (!/^[0-9]+$/.test(cleanTeacherCode)) {
+    return res.status(400).json({ ok: false, message: "รหัสประจำตัวครูต้องเป็นตัวเลขเท่านั้น" });
+  }
 
-// -------------------------------------------------------------
-// POST /api/register/teacher/cancel
-// body: { readerId } — ยกเลิกการสมัครก่อนหมดเวลาเอง (เช่น ครูกดยกเลิก
-// หรือหน้าเว็บถูกปิดไประหว่างรอ)
-// -------------------------------------------------------------
-router.post("/register/teacher/cancel", (req, res) => {
-  const reader = (req.body.readerId || "default").toString();
-  clearRegistration(reader);
-  return res.json({ ok: true });
+  const cleanName = name.trim();
+  const cleanDepartment = department && department.trim() ? department.trim() : null;
+
+  try {
+    const [existingRows] = await query(
+      "SELECT id FROM teachers WHERE teacher_code = ?",
+      [cleanTeacherCode]
+    );
+
+    if (existingRows.length > 0) {
+      return res.status(409).json({
+        ok: false,
+        message: "รหัสประจำตัวนี้ถูกใช้ไปแล้ว กรุณาตั้งรหัสอื่น",
+      });
+    }
+
+    const [insertResult] = await query(
+      "INSERT INTO teachers (name, department, teacher_code) VALUES (?, ?, ?)",
+      [cleanName, cleanDepartment, cleanTeacherCode]
+    );
+
+    const [createdRows] = await query("SELECT * FROM teachers WHERE id = ?", [
+      insertResult.insertId,
+    ]);
+
+    return res.json({
+      ok: true,
+      message: `สมัครสำเร็จ — คุณครู ${cleanName}`,
+      teacher: createdRows[0],
+    });
+  } catch (err) {
+    if (err && (err.code === "ER_DUP_ENTRY" || err.errno === 1062)) {
+      return res.status(409).json({
+        ok: false,
+        message: "รหัสประจำตัวนี้ถูกใช้ไปแล้ว กรุณาตั้งรหัสอื่น",
+      });
+    }
+    console.error("Teacher register error:", err.message);
+    return res.status(500).json({ ok: false, message: "สมัครครูไม่สำเร็จ" });
+  }
 });
 
 // =================================================================

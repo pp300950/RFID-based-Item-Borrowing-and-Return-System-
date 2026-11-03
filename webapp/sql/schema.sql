@@ -35,6 +35,12 @@
 -- timestamptz พอสมควร — DATETIME เก็บค่าตรงไปตรงมากว่า ไม่ auto-convert
 -- ข้าม timezone ให้งงตอน query
 --
+-- [พ.ย. 2026] ตัดตาราง teacher_tags ออกทั้งก้อน — โรงเรียนเลิกใช้บัตร
+-- RFID ประจำตัวครูแล้ว เปลี่ยนไปใช้ teachers.teacher_code (พิมพ์รหัส)
+-- แทนการแตะบัตรเพื่อเปิด session แทน ดู routes/tap.js (POST
+-- /api/tap/teacher-code) — กุญแจห้อง (room_tags) ยังใช้แตะแท็ก RFID
+-- เหมือนเดิมทุกอย่าง ไม่กระทบ
+--
 -- CHECK constraint: MariaDB รองรับตั้งแต่ 10.2+ และ MySQL ตั้งแต่ 8.0.16+
 -- — XAMPP รุ่นใหม่ๆ ส่วนใหญ่ผ่านเกณฑ์นี้แล้ว ถ้ารันแล้วเจอ error แบบ
 -- "check constraint ... syntax" หรือคล้ายกัน (แปลว่าเวอร์ชันเก่ากว่านี้)
@@ -62,24 +68,6 @@ CREATE TABLE `teachers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE INDEX `idx_teachers_teacher_code` ON `teachers` (`teacher_code`);
-
--- -----------------------------------------------------------------
--- teacher_tags: ผูก teacher <-> เลขแท็กประจำตัว (1:1) แอดมิน assign เท่านั้น
--- -----------------------------------------------------------------
-DROP TABLE IF EXISTS `teacher_tags`;
-CREATE TABLE `teacher_tags` (
-  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-  `teacher_id` BIGINT NOT NULL,
-  `tag_uid` VARCHAR(255) NOT NULL,
-  `assigned_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY `uq_teacher_tags_teacher_id` (`teacher_id`),
-  UNIQUE KEY `uq_teacher_tags_tag_uid` (`tag_uid`),
-  CONSTRAINT `fk_teacher_tags_teacher`
-    FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`id`)
-    ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE INDEX `idx_teacher_tags_tag_uid` ON `teacher_tags` (`tag_uid`);
 
 -- -----------------------------------------------------------------
 -- room_tags: กุญแจแต่ละดอก พร้อมสถานะปัจจุบันอยู่ในตัวเลย

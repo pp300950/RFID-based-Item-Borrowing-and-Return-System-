@@ -285,6 +285,40 @@
     z-index: 5;
   }
 
+  /* ----- ปุ่มตอน idle + แผงกรอกรหัส/ลงทะเบียนอาจารย์ ----- */
+  #idle-actions { margin-top: 30px; display: flex; gap: 14px; z-index: 2; }
+  body.in-session #idle-actions { display: none; }
+  .btn {
+    font: inherit; font-size: 18px; padding: 14px 30px; border-radius: 999px;
+    border: 1px solid #44446a; background: transparent; color: var(--text-dim);
+    cursor: pointer; transition: all 0.2s ease;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #0f0f1a; font-weight: 700; }
+  .btn.primary:hover { color: #0f0f1a; box-shadow: 0 0 24px var(--accent-glow); }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  #panel {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: #0a0a14dd; backdrop-filter: blur(6px); z-index: 20;
+  }
+  #panel.show { display: flex; }
+  #panel-box {
+    width: min(460px, 92vw); background: var(--card-bg); border: 1px solid #33335f;
+    border-radius: 20px; padding: 30px 34px; display: flex; flex-direction: column;
+    gap: 16px; text-align: left; box-shadow: 0 12px 50px #000000aa; animation: rise 0.3s ease;
+  }
+  #panel-box h2 { font-size: 24px; }
+  #panel-box label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--text-dim); }
+  #panel-box input {
+    font: inherit; font-size: 20px; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid #44446a; background: #14142a; color: var(--text-main); outline: none;
+  }
+  #panel-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  #panel-error { min-height: 20px; font-size: 14px; color: var(--bad); }
+  #panel-actions { display: flex; gap: 12px; justify-content: flex-end; }
+  #panel-box .btn { font-size: 16px; padding: 10px 24px; }
+  .hidden { display: none !important; }
+
   /* shake animation for errors */
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
@@ -318,8 +352,13 @@
     </div>
   </div>
 
-  <div id="headline">พร้อมรับการแตะบัตร</div>
-  <div id="subline">แตะแท็กประจำตัวครูก่อน แล้วค่อยแตะแท็กกุญแจที่ต้องการยืม/คืน</div>
+  <div id="headline">พร้อมใช้งาน</div>
+  <div id="subline">กรอกรหัสอาจารย์ก่อน แล้วค่อยแตะแท็กกุญแจที่ต้องการยืม/คืน</div>
+
+  <div id="idle-actions">
+    <button class="btn primary" id="open-login">กรอกรหัสอาจารย์</button>
+    <button class="btn" id="open-register">ลงทะเบียนอาจารย์ใหม่</button>
+  </div>
 
   <div id="session-card">
     <div id="teacher-name">—</div>
@@ -335,6 +374,20 @@
 </div>
 
 <div id="toast-log"></div>
+
+<div id="panel" aria-hidden="true">
+  <form id="panel-box" autocomplete="off">
+    <h2 id="panel-title"></h2>
+    <label class="reg-only">ชื่อ-นามสกุล<input id="f-name" type="text" maxlength="100"></label>
+    <label class="reg-only">แผนก / กลุ่มสาระ (ไม่บังคับ)<input id="f-dept" type="text" maxlength="100"></label>
+    <label>รหัสประจำตัวอาจารย์<input id="f-code" type="password" inputmode="numeric" maxlength="20" autocapitalize="off" spellcheck="false"></label>
+    <div id="panel-error" role="alert"></div>
+    <div id="panel-actions">
+      <button type="button" class="btn" id="panel-cancel">ยกเลิก</button>
+      <button type="submit" class="btn primary" id="panel-submit">ยืนยัน</button>
+    </div>
+  </form>
+</div>
 
 <script>
 // ===================================================================
@@ -418,7 +471,7 @@ function pushToast(text) {
 
 function resetToIdle() {
   setIcon('idle');
-  setHeadline('พร้อมรับการแตะบัตร', 'แตะแท็กประจำตัวครูก่อน แล้วค่อยแตะแท็กกุญแจที่ต้องการยืม/คืน', null);
+  setHeadline('พร้อมใช้งาน', 'กรอกรหัสอาจารย์ก่อน แล้วค่อยแตะแท็กกุญแจที่ต้องการยืม/คืน', null);
 }
 
 function scheduleResetHeadline(delayMs) {
@@ -426,7 +479,7 @@ function scheduleResetHeadline(delayMs) {
   resetHeadlineTimer = setTimeout(() => {
     if (sessionActive) {
       setIcon('person');
-      setHeadline(`สวัสดีคุณครู ${currentTeacherName || ''}`, 'แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย', null);
+      setHeadline(`สวัสดีอาจารย์ ${currentTeacherName || ''}`, 'แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย', null);
     } else {
       resetToIdle();
     }
@@ -440,13 +493,15 @@ let currentTeacherName = '';
 function showSessionCard(teacherName, expiresInMs) {
   sessionActive = true;
   currentTeacherName = teacherName || '';
-  el.teacherName.textContent = `คุณครู ${currentTeacherName}`;
+  document.body.classList.add('in-session');
+  el.teacherName.textContent = `อาจารย์ ${currentTeacherName}`;
   el.sessionCard.classList.add('show');
   startCountdown(expiresInMs);
 }
 
 function hideSessionCard() {
   sessionActive = false;
+  document.body.classList.remove('in-session');
   el.sessionCard.classList.remove('show');
   stopCountdown();
 }
@@ -486,6 +541,102 @@ el.doneBtn.addEventListener('click', () => {
   fetch('/api/clear-session', { method: 'POST' }).catch(() => {});
   hideSessionCard();
   resetToIdle();
+});
+
+// ---------------- กรอกรหัสอาจารย์ / ลงทะเบียน ----------------
+const panel = {
+  root: document.getElementById('panel'),
+  title: document.getElementById('panel-title'),
+  name: document.getElementById('f-name'),
+  dept: document.getElementById('f-dept'),
+  code: document.getElementById('f-code'),
+  error: document.getElementById('panel-error'),
+  submit: document.getElementById('panel-submit'),
+  regOnly: document.querySelectorAll('.reg-only'),
+};
+let panelMode = null, panelBusy = false, panelIdleTimer = null;
+
+// หยุด/เปิดการดักค่าเครื่องอ่านฝั่ง Python — ไม่งั้นหน้าต่างรับค่าจะแย่งโฟกัส
+// ทำให้พิมพ์ในช่องบนเว็บไม่ได้
+function setCapturePaused(paused) {
+  fetch('/api/capture', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paused }),
+  }).catch(() => {});
+}
+
+function resetPanelIdleTimer() {
+  clearTimeout(panelIdleTimer);
+  panelIdleTimer = setTimeout(closePanel, 60000); // ลืมปิด -> ปิดเองแล้วกลับมาดักเครื่องอ่าน
+}
+
+function openPanel(mode) {
+  panelMode = mode;
+  const reg = mode === 'register';
+  panel.title.textContent = reg ? 'ลงทะเบียนอาจารย์ใหม่' : 'กรอกรหัสอาจารย์';
+  panel.regOnly.forEach(n => n.classList.toggle('hidden', !reg));
+  panel.code.type = reg ? 'text' : 'password';
+  panel.name.value = panel.dept.value = panel.code.value = '';
+  panel.error.textContent = '';
+  panel.root.classList.add('show');
+  panel.root.setAttribute('aria-hidden', 'false');
+  setCapturePaused(true);
+  resetPanelIdleTimer();
+  setTimeout(() => (reg ? panel.name : panel.code).focus(), 80);
+}
+
+function closePanel() {
+  clearTimeout(panelIdleTimer);
+  panelMode = null;
+  panel.root.classList.remove('show');
+  panel.root.setAttribute('aria-hidden', 'true');
+  panel.code.value = '';
+  setCapturePaused(false);
+}
+
+document.getElementById('open-login').addEventListener('click', () => openPanel('login'));
+document.getElementById('open-register').addEventListener('click', () => openPanel('register'));
+document.getElementById('panel-cancel').addEventListener('click', closePanel);
+panel.root.addEventListener('input', resetPanelIdleTimer);
+// backend รับรหัสเป็นตัวเลขล้วนเท่านั้น
+panel.code.addEventListener('input', () => { panel.code.value = panel.code.value.replace(/\D/g, ''); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelMode) closePanel(); });
+
+document.getElementById('panel-box').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (panelBusy) return;
+  const reg = panelMode === 'register';
+  const body = { teacherCode: panel.code.value.trim() };
+  if (reg) {
+    body.name = panel.name.value.trim();
+    body.department = panel.dept.value.trim();
+    if (!body.name) { panel.error.textContent = 'กรุณากรอกชื่อ-นามสกุล'; return; }
+  }
+  if (!body.teacherCode) { panel.error.textContent = 'กรุณากรอกรหัสประจำตัวอาจารย์ (ตัวเลขเท่านั้น)'; return; }
+
+  panelBusy = true;
+  panel.submit.disabled = true;
+  panel.error.textContent = '';
+  try {
+    const res = await fetch(reg ? '/api/register-teacher' : '/api/teacher-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (data.ok) {
+      closePanel(); // ผลสำเร็จจะมาแสดงบนจอหลักผ่าน SSE (tap_result)
+    } else {
+      panel.error.textContent = data.message || 'ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง';
+      if (!reg) { panel.code.value = ''; panel.code.focus(); }
+    }
+  } catch {
+    panel.error.textContent = 'เชื่อมต่อโปรแกรมรับค่าไม่ได้ ลองใหม่อีกครั้ง';
+  } finally {
+    panelBusy = false;
+    panel.submit.disabled = false;
+  }
 });
 
 // ---------------- SSE ----------------
@@ -555,7 +706,7 @@ function handleEvent(type, data) {
 
     if (ok && state === 'session_started') {
       setIcon('person');
-      setHeadline(`สวัสดีคุณครู ${data.teacher ? data.teacher.name : ''}`, 'แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย', 'good');
+      setHeadline(`สวัสดีอาจารย์ ${data.teacher ? data.teacher.name : ''}`, 'แตะแท็กกุญแจที่ต้องการยืม/คืนได้เลย', 'good');
       flashScreen('good');
       pushToast(`✅ ${msgText}`);
     } else if (ok && state === 'borrowed') {
@@ -581,9 +732,10 @@ function handleEvent(type, data) {
       // tag_already_bound, register_failed, ฯลฯ
       setIcon('bad');
       const title =
-        state === 'session_expired' ? 'กรุณาแตะแท็กครูก่อน' :
+        state === 'session_expired' ? 'กรุณากรอกรหัสอาจารย์ก่อน' :
         state === 'wrong_teacher'   ? 'ทำรายการไม่สำเร็จ' :
         state === 'unknown_tag'     ? 'ไม่พบแท็กนี้ในระบบ' :
+        state === 'outside_window'  ? 'ยังยืมกุญแจนี้ไม่ได้ในช่วงนี้' :
         'เกิดข้อผิดพลาด';
       setHeadline(title, msgText, 'bad');
       flashScreen('bad');

@@ -63,7 +63,7 @@ import urllib.error
 import urllib.request
 from tkinter import ttk
 
-from flask import Flask, Response, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 try:
     import ctypes
@@ -78,6 +78,9 @@ except ImportError:
 BACKEND_URL = "https://rfid-5iaw.onrender.com"
 TAP_ENDPOINT = f"{BACKEND_URL}/api/tap"
 SESSION_ENDPOINT = f"{BACKEND_URL}/api/tap/session"
+# อาจารย์ไม่ใช้บัตรแล้ว — กรอกรหัสประจำตัวแทน (ชื่อ field ตรงกับ tap.js / auth.js)
+TEACHER_CODE_ENDPOINT = f"{BACKEND_URL}/api/tap/teacher-code"
+REGISTER_TEACHER_ENDPOINT = f"{BACKEND_URL}/api/register/teacher"
 READER_ID = "default"
 REQUEST_TIMEOUT_SEC = 5
 
@@ -99,6 +102,9 @@ SESSION_POLL_INTERVAL_SEC = 1.0
 _subscribers = []
 _subscribers_lock = threading.Lock()
 
+# ตั้งไว้ตอนหน้าเว็บเปิดแผงกรอกรหัส -> Tkinter จะไม่แย่งโฟกัสจากเบราว์เซอร์
+capture_paused = threading.Event()
+
 
 def broadcast(event_type, data):
     payload = json.dumps({"type": event_type, "data": data}, ensure_ascii=False)
@@ -117,9 +123,13 @@ def broadcast(event_type, data):
 # เรียก backend จริง (เหมือนเดิมจาก rfid_reader_keyboard.py)
 # -----------------------------------------------------------------
 def post_tap_to_backend(tag_uid, reader_id=READER_ID, timeout=REQUEST_TIMEOUT_SEC):
-    body = json.dumps({"tagUid": tag_uid, "readerId": reader_id}).encode("utf-8")
+    return post_json(TAP_ENDPOINT, {"tagUid": tag_uid, "readerId": reader_id}, timeout)
+
+
+def post_json(url, body_dict, timeout=REQUEST_TIMEOUT_SEC):
+    body = json.dumps(body_dict).encode("utf-8")
     req = urllib.request.Request(
-        TAP_ENDPOINT,
+        url,
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -259,6 +269,8 @@ class CaptureWindow:
         self._poll_language_warning()
 
     def _focus_input(self):
+        if capture_paused.is_set():
+            return
         try:
             self.entry.focus_force()
         except tk.TclError:
@@ -360,6 +372,55 @@ def clear_session():
     """ปุ่ม 'เสร็จสิ้น' บนหน้าจอเว็บเรียกมาที่นี่ -> ส่งต่อไปปิด session จริง"""
     threading.Thread(target=clear_session_on_backend, daemon=True).start()
     return {"ok": True}
+
+
+@app.route("/api/capture", methods=["POST"])
+def set_capture():
+    """หน้าเว็บเรียกตอนเปิด/ปิดแผงกรอกรหัส เพื่อให้ Tkinter เลิกแย่งโฟกัสชั่วคราว"""
+    paused = bool((request.get_json(silent=True) or {}).get("paused"))
+    (capture_paused.set if paused else capture_paused.clear)()
+    return {"ok": True}
+
+
+def _result_payload(ok, payload, default_state):
+    return {
+        "ok": ok,
+        "state": payload.get("state") or (default_state if ok else None),
+        "message": payload.get("message"),
+        "teacher": payload.get("teacher"),
+        "room": payload.get("room"),
+    }
+
+
+@app.route("/api/teacher-code", methods=["POST"])
+def teacher_code():
+    """อาจารย์กรอกรหัสประจำตัวแทนการแตะบัตร -> ส่งต่อ POST /api/tap/teacher-code"""
+    code = str((request.get_json(silent=True) or {}).get("teacherCode", "")).strip()
+    if not code:
+        return jsonify({"ok": False, "message": "กรุณากรอกรหัสประจำตัวอาจารย์"}), 400
+    ok, payload = post_json(TEACHER_CODE_ENDPOINT, {"teacherCode": code, "readerId": READER_ID})
+    ok = ok and payload.get("ok") is not False
+    result = _result_payload(ok, payload, "session_started")
+    if ok:
+        broadcast("tap_result", {"tagUid": None, **result})
+    return jsonify(result)
+
+
+@app.route("/api/register-teacher", methods=["POST"])
+def register_teacher():
+    """ลงทะเบียนอาจารย์ใหม่ {name, department, teacherCode} -> POST /api/register/teacher"""
+    data = request.get_json(silent=True) or {}
+    body = {k: str(data.get(k, "")).strip() for k in ("name", "department", "teacherCode")}
+    if not body["name"] or not body["teacherCode"]:  # department ไม่บังคับ (ตรงกับ auth.js)
+        return jsonify({"ok": False, "message": "กรุณากรอกชื่อ-นามสกุลและรหัสประจำตัว"}), 400
+    ok, payload = post_json(REGISTER_TEACHER_ENDPOINT, body)
+    ok = ok and payload.get("ok") is not False
+    result = _result_payload(ok, payload, "registered")
+    result["state"] = "registered" if ok else result["state"]
+    if ok:
+        result["message"] = payload.get("message") or f"ลงทะเบียน {body['name']} แล้ว กรอกรหัสเพื่อเริ่มใช้งานได้เลย"
+        broadcast("tap_result", {"tagUid": None, **result})
+    return jsonify(result)
 
 
 def run_flask():
