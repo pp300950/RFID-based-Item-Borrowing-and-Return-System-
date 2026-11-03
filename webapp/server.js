@@ -40,7 +40,7 @@ const adminKeysRoutes = require("./routes/admin_keys");
 const exportRoutes = require("./routes/export");
 const lineWebhookRoutes = require("./routes/line_webhook");
 const adminLineRoutes = require("./routes/admin_line");
-const { runOverdueCheck } = require("./services/overdue_checker");
+const { runOverdueCheck, checkEveningUnreturned } = require("./services/overdue_checker");
 const { sendGroupMessage, buildServerReadyMessage } = require("./services/line_notify");
 
 const app = express();
@@ -254,5 +254,32 @@ if (cron.validate(OVERDUE_CHECK_CRON)) {
 } else {
   console.error(
     `[cron] OVERDUE_CHECK_CRON ไม่ใช่ cron expression ที่ถูกต้อง: "${OVERDUE_CHECK_CRON}" — ปิดการเช็คเกินเวลาไว้ก่อน`
+  );
+}
+
+// -------------------------------------------------------------
+// [LINE notify] Cron แจ้งเตือนรวบยอดตอน 16:20 ทุกวัน — แยกจาก cron
+// ทุก 15 นาทีด้านบนโดยสิ้นเชิง (คนละฟังก์ชัน คนละ query คนละเงื่อนไข)
+// ไม่สนใจ borrow_window_end เลย แค่ดูว่า ณ เวลานั้นยังมีห้องไหน
+// status='borrowed' ค้างอยู่บ้าง ถ้ามีค่อยส่งเป็นข้อความเดียวรวม
+// ทุกห้อง ถ้าไม่มีก็เงียบ ไม่ส่งอะไร (ดู checkEveningUnreturned ใน
+// services/overdue_checker.js)
+//
+// "20 16 * * *" = นาทีที่ 20, ชั่วโมงที่ 16 (24-hr) = ทุกวันเวลา 16:20
+// ปรับเวลาได้ผ่าน env EVENING_REMINDER_CRON ถ้าต้องการเปลี่ยนภายหลัง
+// โดยไม่ต้องแก้โค้ด
+// -------------------------------------------------------------
+const EVENING_REMINDER_CRON = process.env.EVENING_REMINDER_CRON || "20 16 * * *";
+
+if (cron.validate(EVENING_REMINDER_CRON)) {
+  cron.schedule(EVENING_REMINDER_CRON, () => {
+    checkEveningUnreturned().catch((err) =>
+      console.error("Cron checkEveningUnreturned ล้มเหลว:", err.message)
+    );
+  });
+  console.log(`[cron] ตั้งเวลาแจ้งเตือนประจำวันแล้ว: "${EVENING_REMINDER_CRON}"`);
+} else {
+  console.error(
+    `[cron] EVENING_REMINDER_CRON ไม่ใช่ cron expression ที่ถูกต้อง: "${EVENING_REMINDER_CRON}" — ปิดการแจ้งเตือนประจำวันไว้ก่อน`
   );
 }

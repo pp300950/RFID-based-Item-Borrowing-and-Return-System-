@@ -26,7 +26,11 @@
 // -----------------------------------------------------------------
 
 const { query } = require("../config/db");
-const { sendGroupMessage, buildOverdueMessage } = require("./line_notify");
+const {
+  sendGroupMessage,
+  buildOverdueMessage,
+  buildEveningReminderMessage,
+} = require("./line_notify");
 
 function pad2(n) {
   return String(n).padStart(2, "0");
@@ -155,4 +159,82 @@ async function runOverdueCheck() {
   }
 }
 
-module.exports = { runOverdueCheck, findOverdueBorrows };
+// -------------------------------------------------------------
+// findAllUnreturned() -> Promise<Array<{ roomTagId, roomName,
+//   teacherName }>>
+//
+// ดึง "ทุกห้อง" ที่ status='borrowed' อยู่ ณ ตอนนี้ ไม่สนใจ
+// borrow_window_end / เวลาเกินกำหนดเลย (คนละแนวคิดกับ
+// findOverdueBorrows ด้านบน) ใช้สำหรับแจ้งเตือนรวบยอดตอน 16:20
+// ทุกวัน — ถ้าห้องไหนยังไม่คืนตอนนั้นก็เข้าข่ายหมด ไม่ว่าจะตั้ง
+// borrow_window_end ไว้หรือไม่ และไม่ว่าจะเกินเวลานั้นหรือยัง
+// -------------------------------------------------------------
+async function findAllUnreturned() {
+  const [rows] = await query(
+    `
+    SELECT
+      rt.id AS room_tag_id,
+      rt.room_name,
+      t.name AS teacher_name
+    FROM room_tags rt
+    INNER JOIN teachers t ON t.id = rt.borrowed_by_teacher_id
+    WHERE rt.status = 'borrowed'
+    ORDER BY rt.room_name ASC
+    `
+  );
+
+  return rows.map((row) => ({
+    roomTagId: row.room_tag_id,
+    roomName: row.room_name,
+    teacherName: row.teacher_name,
+  }));
+}
+
+// -------------------------------------------------------------
+// checkEveningUnreturned() — entry point ที่ cron (server.js) เรียก
+// ตอน 16:20 ทุกวัน ส่งข้อความเดียวรวมทุกห้องที่ยังไม่คืน ถ้าไม่มี
+// ห้องไหนค้างเลยก็ไม่ส่งอะไร (เงียบ ไม่ log ด้วย กันรกเหมือน
+// runOverdueCheck ด้านบน)
+//
+// ตั้งใจแยกจาก runOverdueCheck/findOverdueBorrows โดยสิ้นเชิง — อันนี้
+// ไม่เช็ค overdue_notified_date เลย เพราะเป็นการแจ้งเตือนรวบยอด
+// "ครั้งเดียวต่อวันตามเวลาตายตัว" (cron ตั้งเวลาเฉพาะ 16:20 เองอยู่
+// แล้ว ไม่มีโอกาสรันซ้ำวันเดียวกันเหมือน cron ทุก 15 นาที) จึงไม่ต้อง
+// มี mechanism กันแจ้งซ้ำแบบนั้น
+// -------------------------------------------------------------
+async function checkEveningUnreturned() {
+  let list;
+  try {
+    list = await findAllUnreturned();
+  } catch (err) {
+    console.error(
+      "checkEveningUnreturned: query หากุญแจที่ยังไม่คืนไม่สำเร็จ:",
+      err.message
+    );
+    return;
+  }
+
+  if (list.length === 0) {
+    return; // ไม่มีใครค้าง — เงียบ ไม่ต้องส่งอะไร
+  }
+
+  const text = buildEveningReminderMessage(list);
+  const result = await sendGroupMessage(text);
+
+  if (result.ok) {
+    console.log(
+      `[overdue_checker] แจ้งเตือนประจำวัน 16:20 แล้ว (${list.length} รายการค้างคืน)`
+    );
+  } else {
+    console.error(
+      `[overdue_checker] ส่งแจ้งเตือนประจำวัน 16:20 ไม่สำเร็จ: ${result.message}`
+    );
+  }
+}
+
+module.exports = {
+  runOverdueCheck,
+  findOverdueBorrows,
+  checkEveningUnreturned,
+  findAllUnreturned,
+};

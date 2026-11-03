@@ -467,6 +467,20 @@
    }
    
    input::placeholder { color: var(--text-low); }
+
+   /* กัน Chrome/Edge ทาสีพื้นช่อง input เป็นขาว/เหลืองตอน autofill
+      (เช่น jตอนจำ username/password ไว้) ต้อง override ด้วย -webkit-
+      autofill โดยเฉพาะ ใช้ box-shadow ขนาดใหญ่ล้นกรอบแทน background
+      เพราะ background-color ของ autofill สั่งผ่าน CSS ปกติไม่ได้ */
+   input:-webkit-autofill,
+   input:-webkit-autofill:hover,
+   input:-webkit-autofill:focus {
+     -webkit-text-fill-color: var(--text-hi);
+     -webkit-box-shadow: 0 0 0 1000px var(--panel-2) inset;
+     box-shadow: 0 0 0 1000px var(--panel-2) inset;
+     border-radius: 9px;
+     transition: background-color 9999s ease-in-out 0s;
+   }
    
    input:focus {
      border-color: var(--red);

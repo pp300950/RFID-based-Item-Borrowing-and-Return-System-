@@ -198,7 +198,7 @@ async function getMessageQuota() {
 function buildBorrowedMessage({ teacherName, roomName, time }) {
   return (
     `🔑 แจ้งเตือนการยืมกุญแจ\n` +
-    `คุณครู ${teacherName} ยืมกุญแจห้อง "${roomName}"\n` +
+    `อาจารย์ ${teacherName} ยืมกุญแจห้อง "${roomName}"\n` +
     `เวลา ${time}`
   );
 }
@@ -206,7 +206,7 @@ function buildBorrowedMessage({ teacherName, roomName, time }) {
 function buildOverdueMessage({ teacherName, roomName, dueTime }) {
   return (
     `⏰ แจ้งเตือนเกินเวลาคืนกุญแจ\n` +
-    `คุณครู ${teacherName} ยังไม่ได้คืนกุญแจห้อง "${roomName}"\n` +
+    `อาจารย์ ${teacherName} ยังไม่ได้คืนกุญแจห้อง "${roomName}"\n` +
     `(กำหนดคืนภายใน ${dueTime} น.) กรุณาอย่าลืมนำมาคืนด้วยครับ/ค่ะ`
   );
 }
@@ -221,6 +221,26 @@ function buildServerReadyMessage({ time } = {}) {
     timeStyle: "short",
   });
   return `✅ ระบบยืม-คืนกุญแจพร้อมทำงานแล้ว\nเวลาเริ่มทำงาน: ${t}`;
+}
+
+// -------------------------------------------------------------
+// buildEveningReminderMessage(list) — ข้อความสรุปตอน 16:20 แจ้งรวม
+// กุญแจทุกดอกที่ยัง "ยืมอยู่" (ไม่ได้ดูเรื่อง borrow_window_end เลย
+// ต่างจาก buildOverdueMessage ที่แยกส่งทีละห้อง) ส่งเป็นข้อความเดียว
+// รวมทุกห้อง/อาจารย์ไว้ด้วยกัน เรียกจาก checkEveningUnreturned() ใน
+// overdue_checker.js
+// -------------------------------------------------------------
+function buildEveningReminderMessage(list) {
+  const lines = list
+    .map((item) => `- อาจารย์ ${item.teacherName} (ห้อง "${item.roomName}")`)
+    .join("\n");
+
+  return (
+    `🔔 แจ้งเตือนประจำวัน (16:20)\n` +
+    `ยังมีกุญแจที่ยังไม่คืน ${list.length} รายการ:\n` +
+    `${lines}\n` +
+    `กรุณานำกุญแจมาคืนด้วยครับ/ค่ะ`
+  );
 }
 
 // -------------------------------------------------------------
@@ -249,6 +269,7 @@ module.exports = {
   getMessageQuota,
   buildBorrowedMessage,
   buildOverdueMessage,
+  buildEveningReminderMessage,
   buildServerReadyMessage,
   buildQuotaReplyMessage,
   resolveTargetId,
